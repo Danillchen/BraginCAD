@@ -26,3 +26,14 @@
 - `Recent` повторно открывает файлы по сохранённому `content://` URI.
 
 `test_01.dwg` определяет единицы как миллиметры (`INSUNITS=4`). Для unitless/unknown DWG интерфейс явно показывает `drawing units`, не предполагая миллиметры.
+
+## Multi-DWG regression
+
+Debug APK поддерживает автоматический regression-вход для DWG из `test-data`; release-сборка его игнорирует. Runner собирает version/entity coverage, unsupported breakdown, decode/model/render timings, primitive count, PSS и признаки Java/native crash для каждого файла:
+
+```powershell
+$env:ANDROID_HOME = "C:\Android\Sdk"
+.\scripts\run-dwg-regression.ps1
+```
+
+Отчёты JSON, CSV, Markdown и полный Logcat каждого DWG сохраняются в `build/regression`. Можно передать `-Device emulator-5554`, `-InputDirectory path` и `-SkipBuild`/`-SkipInstall`. Runner принимает все `.dwg` каталога в сортированном порядке, поэтому новые файлы автоматически попадают в следующий прогон.

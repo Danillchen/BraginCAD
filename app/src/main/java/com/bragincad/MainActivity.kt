@@ -3,6 +3,7 @@ package com.bragincad
 import android.app.*
 import android.content.*
 import android.database.Cursor
+import android.content.pm.ApplicationInfo
 import android.net.Uri
 import android.os.Bundle
 import android.provider.OpenableColumns
@@ -36,7 +37,11 @@ class MainActivity:Activity(){
             onMeasurement={distance,unit,snapped->status.text=formatDistance(distance,unit,snapped)}
         }
         root.addView(status);root.addView(scroll);root.addView(view,LinearLayout.LayoutParams(-1,0,1f));setContentView(root)
-        val asset=filesDir.resolve("test_01.dwg");assets.open("test_01.dwg").use{input->asset.outputStream().use(input::copyTo)};loadPath(asset,"test_01.dwg")
+        val debuggable=applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE!=0
+        val regressionName=intent.getStringExtra("regression_file")?.takeIf{debuggable&&it.matches(Regex("[A-Za-z0-9._-]+\\.dwg",RegexOption.IGNORE_CASE))}
+        val regressionFile=regressionName?.let{File(filesDir,"regression/$it")}
+        Log.i("BraginCAD","RegressionInput extra=${intent.getStringExtra("regression_file")} debuggable=$debuggable path=${regressionFile?.absolutePath} exists=${regressionFile?.isFile}")
+        if(regressionFile?.isFile==true)loadPath(regressionFile,regressionName)else{val asset=filesDir.resolve("test_01.dwg");assets.open("test_01.dwg").use{input->asset.outputStream().use(input::copyTo)};loadPath(asset,"test_01.dwg")}
     }
 
     private fun openDocument(){

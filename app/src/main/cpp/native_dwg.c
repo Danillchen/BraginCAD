@@ -130,10 +130,10 @@ JNIEXPORT jobjectArray JNICALL Java_com_bragincad_dwg_LibreDwgAdapter_nativeRead
   LOGI("block_profile definitions=%zu anonymous=%zu inserts=%zu rotated=%zu scaled=%zu nonuniform=%zu nested=%zu max_depth=%d cycles=%zu dimension_blocks=%zu",block_stats.definitions,block_stats.anonymous,block_stats.inserts,block_stats.rotated,block_stats.scaled,block_stats.nonuniform,block_stats.nested,block_stats.max_depth,block_stats.cycles,block_stats.dimension_blocks);
 
   TypeCount *types=NULL,*unsupported_types=NULL; size_t type_n=0,type_cap=0,unsupported_n=0,unsupported_cap=0;
-  size_t supported=0, unsupported_graphics=0, graphical=0, service=0, structural=0,invisible_graphical=0;StringBuffer texts={0};int *object_layers=malloc((dwg.num_objects?dwg.num_objects:1)*sizeof(int));for(BITCODE_BL i=0;i<dwg.num_objects;i++)object_layers[i]=0;
+  size_t supported=0, unsupported_graphics=0, graphical=0, service=0, structural=0,invisible_graphical=0;size_t hatch_solid=0,hatch_pattern=0,hatch_paths=0,spline_ctrl=0,spline_fit=0,wipeout_clips=0,viewport_model=0,viewport_paper=0,viewport_block=0;int spline_max_degree=0;StringBuffer texts={0};int *object_layers=malloc((dwg.num_objects?dwg.num_objects:1)*sizeof(int));for(BITCODE_BL i=0;i<dwg.num_objects;i++)object_layers[i]=0;
   Buffer b={0}; for(int i=0;i<10;i++) push(&b,0);
   for (BITCODE_BL i=0;i<dwg.num_objects;i++) {
-    Dwg_Object *o=&dwg.object[i]; const char *type_name=o->name ? o->name : (o->dxfname ? o->dxfname : "UNKNOWN");
+    Dwg_Object *o=&dwg.object[i];const char *unknown_class=NULL;if(o->fixedtype==DWG_TYPE_UNKNOWN_ENT){if(o->klass&&o->klass->dxfname)unknown_class=o->klass->dxfname;else if(o->type>=500&&(unsigned)(o->type-500)<dwg.num_classes)unknown_class=dwg.dwg_class[o->type-500].dxfname;else if(o->dxfname&&strcmp(o->dxfname,"UNKNOWN_ENT"))unknown_class=o->dxfname;}const char *type_name=unknown_class?unknown_class:(o->name ? o->name : (o->dxfname ? o->dxfname : "UNKNOWN"));
     count_type(&types,&type_n,&type_cap,type_name);
     if (o->supertype == DWG_SUPERTYPE_OBJECT) { service++; continue; }
     if (o->supertype != DWG_SUPERTYPE_ENTITY || !o->tio.entity) continue;
@@ -143,6 +143,10 @@ JNIEXPORT jobjectArray JNICALL Java_com_bragincad_dwg_LibreDwgAdapter_nativeRead
     int layer=layer_index(entity_layer,layer_names,layer_count);
     object_layers[o->index]=layer;int rendered=0;
     if(o->fixedtype==DWG_TYPE_POINT && o->tio.entity->tio.POINT){Dwg_Entity_POINT *p=o->tio.entity->tio.POINT;if((unsigned)layer<layer_count)point_layers[layer]++;if(p->x<point_min_x)point_min_x=p->x;if(p->y<point_min_y)point_min_y=p->y;if(p->x>point_max_x)point_max_x=p->x;if(p->y>point_max_y)point_max_y=p->y;}
+    if(o->fixedtype==DWG_TYPE_HATCH&&o->tio.entity->tio.HATCH){Dwg_Entity_HATCH *e=o->tio.entity->tio.HATCH;if(e->is_solid_fill)hatch_solid++;else hatch_pattern++;hatch_paths+=e->num_paths;}
+    if(o->fixedtype==DWG_TYPE_SPLINE&&o->tio.entity->tio.SPLINE){Dwg_Entity_SPLINE *e=o->tio.entity->tio.SPLINE;spline_ctrl+=e->num_ctrl_pts;spline_fit+=e->num_fit_pts;if(e->degree>spline_max_degree)spline_max_degree=e->degree;}
+    if(o->fixedtype==DWG_TYPE_WIPEOUT&&o->tio.entity->tio.WIPEOUT)wipeout_clips+=o->tio.entity->tio.WIPEOUT->num_clip_verts;
+    if(o->fixedtype==DWG_TYPE_VIEWPORT){if(o->tio.entity->entmode==1)viewport_paper++;else if(o->tio.entity->entmode==2)viewport_model++;else viewport_block++;}
     switch(o->fixedtype) {
       case DWG_TYPE_LINE:case DWG_TYPE_CIRCLE:case DWG_TYPE_ARC:case DWG_TYPE_LWPOLYLINE:case DWG_TYPE_ELLIPSE:case DWG_TYPE_TEXT:case DWG_TYPE_MTEXT:case DWG_TYPE_INSERT:case DWG_TYPE_ATTRIB:rendered=1;break;
       case DWG_TYPE_DIMENSION_LINEAR:case DWG_TYPE_DIMENSION_ALIGNED:rendered=dwg_ref_object_silent(&dwg,o->tio.entity->tio.DIMENSION_common->block)!=NULL;break;
@@ -171,6 +175,7 @@ JNIEXPORT jobjectArray JNICALL Java_com_bragincad_dwg_LibreDwgAdapter_nativeRead
   LOGI("decoded objects=%u graphical=%zu visible_graphical=%zu service=%zu structural=%zu supported=%zu unsupported_graphical=%zu primitives=%zu block_cycles=%zu depth_stops=%zu layers=%u units=%u error=%d",dwg.num_objects,graphical,graphical-invisible_graphical,service,structural,supported,unsupported_graphics,render.primitives,render.cycles,render.depth_stops,layer_count,dwg.header_vars.INSUNITS,decode_error);
   LOGI("timing decode_ms=%.2f native_model_build_ms=%.2f",decode_ms,build_ms);
   LOGI("point_usage pdmode=%d pdsize=%.6g bounds=[%.6g,%.6g]-[%.6g,%.6g]",dwg.header_vars.PDMODE,dwg.header_vars.PDSIZE,point_min_x,point_min_y,point_max_x,point_max_y);
+  LOGI("remaining_profile hatch_solid=%zu hatch_pattern=%zu hatch_paths=%zu spline_ctrl=%zu spline_fit=%zu spline_max_degree=%d wipeout_clip_vertices=%zu viewport_model=%zu viewport_paper=%zu viewport_block=%zu",hatch_solid,hatch_pattern,hatch_paths,spline_ctrl,spline_fit,spline_max_degree,wipeout_clips,viewport_model,viewport_paper,viewport_block);
   for(unsigned int i=0;i<layer_count;i++)if(point_layers[i])LOGI("point_layer name=%s count=%zu visible=%d",layer_names[i],point_layers[i],layer_visible[i]);
   for(unsigned int i=0;i<layer_count;i++)free(layer_names[i]);for(size_t i=0;i<texts.n;i++)free(texts.v[i]);free(texts.v);free(object_layers);free(point_layers);free(layer_names);free(layer_visible);free(layers);free(types);free(unsupported_types);free(b.v);dwg_free(&dwg);return result;
 }
