@@ -1,86 +1,180 @@
 package com.bragincad
 
-import android.app.*
+import android.app.Activity
 import android.content.*
-import android.database.Cursor
 import android.content.pm.ApplicationInfo
+import android.database.Cursor
+import android.graphics.Color as AndroidColor
 import android.net.Uri
 import android.os.Bundle
 import android.provider.OpenableColumns
 import android.util.Log
-import android.view.View
-import android.widget.*
+import android.widget.Toast
+import androidx.activity.ComponentActivity
+import androidx.activity.SystemBarStyle
+import androidx.activity.compose.BackHandler
+import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
+import androidx.compose.animation.*
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
 import com.bragincad.dwg.LibreDwgAdapter
-import com.bragincad.model.DrawingModel
-import com.bragincad.model.DrawingUnit
+import com.bragincad.model.*
 import com.bragincad.view.DrawingView
 import java.io.File
+import java.text.NumberFormat
 import java.util.Locale
 import kotlin.concurrent.thread
 
-class MainActivity:Activity(){
-    private lateinit var status:TextView;private lateinit var view:DrawingView
-    private var model:DrawingModel?=null
-    private val prefs by lazy{getSharedPreferences("bragincad",MODE_PRIVATE)}
-    private data class Recent(val uri:String,val label:String)
+class MainActivity : ComponentActivity() {
+    private var model by mutableStateOf<DrawingModel?>(null)
+    private var fileLabel by mutableStateOf("")
+    private var loading by mutableStateOf(false)
+    private var errorText by mutableStateOf<String?>(null)
+    private var themeChoice by mutableIntStateOf(0)
+    private var drawingView: DrawingView? = null
+    private val prefs by lazy { getSharedPreferences("bragincad", MODE_PRIVATE) }
+    private data class Recent(val uri: String, val label: String)
 
-    override fun onCreate(state:Bundle?){
+    override fun onCreate(state: Bundle?) {
         super.onCreate(state)
-        val root=LinearLayout(this).apply{orientation=LinearLayout.VERTICAL}
-        status=TextView(this).apply{setPadding(20,12,20,12);text="BraginCAD — opening regression DWG…"}
-        val actions=LinearLayout(this).apply{orientation=LinearLayout.HORIZONTAL}
-        fun button(text:String,action:()->Unit)=Button(this).apply{this.text=text;setOnClickListener{action()}}
-        actions.addView(button("Open"){openDocument()});actions.addView(button("Recent"){showRecent()});actions.addView(button("Layers"){showLayers()});actions.addView(button("Measure"){startMeasure()});actions.addView(button("Fit"){view.fitToDrawing()});actions.addView(button("Stats"){showStats()})
-        val scroll=HorizontalScrollView(this).apply{addView(actions)}
-        view=DrawingView(this).apply{
-            onFirstMeasurePoint={status.text="Measurement: select second point (endpoint snap active)"}
-            onMeasurement={distance,unit,snapped->status.text=formatDistance(distance,unit,snapped)}
-        }
-        root.addView(status);root.addView(scroll);root.addView(view,LinearLayout.LayoutParams(-1,0,1f));setContentView(root)
-        val debuggable=applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE!=0
-        val regressionName=intent.getStringExtra("regression_file")?.takeIf{debuggable&&it.matches(Regex("[A-Za-z0-9._-]+\\.dwg",RegexOption.IGNORE_CASE))}
-        val regressionFile=regressionName?.let{File(filesDir,"regression/$it")}
-        Log.i("BraginCAD","RegressionInput extra=${intent.getStringExtra("regression_file")} debuggable=$debuggable path=${regressionFile?.absolutePath} exists=${regressionFile?.isFile}")
-        if(regressionFile?.isFile==true)loadPath(regressionFile,regressionName)else{val asset=filesDir.resolve("test_01.dwg");assets.open("test_01.dwg").use{input->asset.outputStream().use(input::copyTo)};loadPath(asset,"test_01.dwg")}
+        enableEdgeToEdge()
+        themeChoice = prefs.getInt("theme", 0)
+        setContent { BraginCadApp() }
+        val debuggable = applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0
+        val regressionName = intent.getStringExtra("regression_file")?.takeIf { debuggable && it.matches(Regex("[A-Za-z0-9._-]+\\.dwg", RegexOption.IGNORE_CASE)) }
+        val regressionFile = regressionName?.let { File(filesDir, "regression/$it") }
+        Log.i("BraginCAD", "RegressionInput extra=${intent.getStringExtra("regression_file")} debuggable=$debuggable path=${regressionFile?.absolutePath} exists=${regressionFile?.isFile}")
+        if (regressionFile?.isFile == true) loadPath(regressionFile, regressionName)
     }
 
-    private fun openDocument(){
-        val intent=Intent(Intent.ACTION_OPEN_DOCUMENT).apply{addCategory(Intent.CATEGORY_OPENABLE);type="*/*";putExtra(Intent.EXTRA_MIME_TYPES,arrayOf("application/acad","application/x-acad","application/dwg","image/vnd.dwg","application/octet-stream"))}
-        startActivityForResult(intent,OPEN_DWG)
-    }
-
-    @Deprecated("Activity result retained to keep the milestone dependency-free")
-    override fun onActivityResult(requestCode:Int,resultCode:Int,data:Intent?){
-        super.onActivityResult(requestCode,resultCode,data);if(requestCode!=OPEN_DWG||resultCode!=RESULT_OK)return
-        val uri=data?.data?:return;val label=displayName(uri)?:"drawing.dwg"
-        if(!label.endsWith(".dwg",true)){Toast.makeText(this,"Select a .dwg file",Toast.LENGTH_LONG).show();return}
-        runCatching{contentResolver.takePersistableUriPermission(uri,Intent.FLAG_GRANT_READ_URI_PERMISSION)}
-        addRecent(uri,label);loadUri(uri,label)
-    }
-
-    private fun loadUri(uri:Uri,label:String){
-        status.text="Opening $label…";thread(name="dwg-copy-parse"){
-            try{val local=File(cacheDir,"opened_${uri.toString().hashCode()}.dwg");contentResolver.openInputStream(uri).use{input->requireNotNull(input){"Cannot open file"};local.outputStream().use(input::copyTo)};parse(local,label)}
-            catch(t:Throwable){showError(t)}
+    @Composable
+    private fun BraginCadApp() {
+        val systemDark = androidx.compose.foundation.isSystemInDarkTheme()
+        val dark = when (themeChoice) { 1 -> false; 2 -> true; else -> systemDark }
+        SideEffect { enableEdgeToEdge(statusBarStyle = SystemBarStyle.auto(AndroidColor.TRANSPARENT, AndroidColor.TRANSPARENT) { dark }, navigationBarStyle = SystemBarStyle.auto(AndroidColor.TRANSPARENT, AndroidColor.TRANSPARENT) { dark }) }
+        val colors = if (dark) darkColorScheme(primary = Color(0xFF7DD3FC), secondary = Color(0xFF67E8F9), background = Color(0xFF0B1116), surface = Color(0xFF121A21), surfaceContainer = Color(0xFF172129)) else lightColorScheme(primary = Color(0xFF00658A), secondary = Color(0xFF006878), background = Color(0xFFF6F8FA), surface = Color(0xFFFDFDFE), surfaceContainer = Color(0xFFEAF0F3))
+        MaterialTheme(colorScheme = colors, typography = Typography()) {
+            Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
+                when {
+                    model != null -> ViewerScreen(dark)
+                    else -> StartScreen()
+                }
+                errorText?.let { message -> AlertDialog(onDismissRequest = { errorText = null }, title = { Text(stringResource(R.string.unable_open_drawing)) }, text = { Text(message) }, confirmButton = { TextButton(onClick = { errorText = null }) { Text(stringResource(R.string.close)) } }) }
+            }
         }
     }
-    private fun loadPath(file:File,label:String){status.text="Opening $label…";thread(name="dwg-parser"){try{parse(file,label)}catch(t:Throwable){showError(t)}}}
-    private fun parse(file:File,label:String){
-        val drawing=LibreDwgAdapter().read(file.absolutePath);val unsupported=drawing.stats.unsupportedByType.entries.sortedByDescending{it.value}.joinToString{ "${it.key}=${it.value}" };Log.i("BraginCAD","file=$label version=${drawing.version} objects=${drawing.stats.totalObjects} graphical=${drawing.stats.graphicalEntities} visibleGraphical=${drawing.stats.visibleGraphicalEntities} service=${drawing.stats.serviceObjects} structural=${drawing.stats.structuralEntities} supported=${drawing.stats.supportedEntities} unsupportedGraphical=${drawing.stats.unsupportedGraphicalEntities} unsupportedVisible=${drawing.stats.unsupportedVisibleGraphicalEntities} coverage=${"%.2f".format(Locale.US,100.0*drawing.stats.supportedEntities/drawing.stats.graphicalEntities)}% visibleCoverage=${"%.2f".format(Locale.US,100.0*(drawing.stats.visibleGraphicalEntities-drawing.stats.unsupportedVisibleGraphicalEntities)/drawing.stats.visibleGraphicalEntities)}% primitives=${drawing.stats.renderPrimitiveCount} layers=${drawing.layers.size} units=${drawing.units} modelBuildMs=${drawing.parseMs} unsupportedRanking=[$unsupported]")
-        runOnUiThread{model=drawing;view.model=drawing;status.text="$label • ${drawing.primitives.size} primitives • ${drawing.layers.size} layers • ${drawing.units.symbol} • ${drawing.parseMs} ms"}
+
+    @Composable
+    private fun StartScreen() {
+        val recentItems = remember(model, loading) { recent() }
+        Scaffold(contentWindowInsets = WindowInsets.safeDrawing) { padding ->
+            Column(Modifier.fillMaxSize().padding(padding).padding(horizontal = 24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                Spacer(Modifier.weight(0.7f))
+                Surface(shape = CircleShape, color = MaterialTheme.colorScheme.primaryContainer, modifier = Modifier.size(84.dp)) { Icon(UxIcons.Brand, null, Modifier.padding(20.dp), tint = MaterialTheme.colorScheme.onPrimaryContainer) }
+                Spacer(Modifier.height(20.dp)); Text(stringResource(R.string.app_name), style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.SemiBold)
+                Spacer(Modifier.height(32.dp))
+                Button(onClick = ::openDocument, enabled = !loading, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Icon(UxIcons.Folder, null); Spacer(Modifier.width(10.dp)); Text(if (loading) stringResource(R.string.loading_drawing) else stringResource(R.string.open_drawing)) }
+                Spacer(Modifier.height(36.dp)); Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) { Text(stringResource(R.string.recent), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Medium) }
+                Spacer(Modifier.height(8.dp))
+                if (recentItems.isEmpty()) Box(Modifier.fillMaxWidth().height(80.dp), contentAlignment = Alignment.CenterStart) { Text(stringResource(R.string.no_recent_files), color = MaterialTheme.colorScheme.onSurfaceVariant) }
+                else LazyColumn(Modifier.fillMaxWidth().weight(1f)) { items(recentItems, key = { it.uri }) { item -> ListItem(headlineContent = { Text(item.label, maxLines = 1, overflow = TextOverflow.Ellipsis) }, leadingContent = { Icon(UxIcons.Document, null) }, modifier = Modifier.clickable { loadUri(Uri.parse(item.uri), item.label) }); HorizontalDivider() } }
+                if (recentItems.isEmpty()) Spacer(Modifier.weight(1f))
+            }
+        }
     }
-    private fun showError(t:Throwable){Log.e("BraginCAD","DWG open failed",t);runOnUiThread{status.text="DWG error: ${t.message}"}}
 
-    private fun showLayers(){val drawing=model?:return;val names=drawing.layers.map{it.name}.toTypedArray();val checked=BooleanArray(names.size){view.isLayerVisible(it)};AlertDialog.Builder(this).setTitle("Layers (${names.size})").setMultiChoiceItems(names,checked){_,which,isChecked->view.setLayerVisible(which,isChecked)}.setPositiveButton("Done",null).show()}
-    private fun startMeasure(){if(model==null)return;view.startMeasurement();status.text="Measurement: select first point (endpoint snap active)"}
-    private fun formatDistance(value:Double,unit:DrawingUnit,snapped:Boolean):String{val suffix=if(snapped)" • endpoint snapped" else "";return if(unit==DrawingUnit.UNITLESS||unit==DrawingUnit.UNKNOWN)"Distance: ${"%.4f".format(Locale.US,value)} drawing units (unit unspecified)$suffix" else "Distance: ${"%.4f".format(Locale.US,value)} ${unit.symbol}$suffix"}
+    @OptIn(ExperimentalMaterial3Api::class)
+    @Composable
+    private fun ViewerScreen(dark: Boolean) {
+        var menuOpen by remember { mutableStateOf(false) }
+        var layersOpen by remember { mutableStateOf(false) }
+        var measuring by remember { mutableStateOf(false) }
+        var measurement by remember { mutableStateOf(getString(R.string.measurement_first)) }
+        var overflowOpen by remember { mutableStateOf(false) }
+        var dialog by remember { mutableStateOf<String?>(null) }
+        var settingsOpen by remember { mutableStateOf(false) }
+        val drawing = model ?: return
+        BackHandler(menuOpen || layersOpen || measuring) { when { layersOpen -> layersOpen = false; menuOpen -> menuOpen = false; measuring -> { drawingView?.cancelMeasurement(); measuring = false } } }
+        Scaffold(
+            contentWindowInsets = WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal),
+            topBar = {
+                TopAppBar(title = { Text(fileLabel, maxLines = 1, overflow = TextOverflow.Ellipsis) }, navigationIcon = { IconButton(onClick = { drawingView?.cancelMeasurement(); model = null; fileLabel = "" }) { Icon(Icons.Default.ArrowBack, stringResource(R.string.back)) } }, actions = { Box { IconButton(onClick = { overflowOpen = true }) { Icon(Icons.Default.MoreVert, stringResource(R.string.more_options)) }; DropdownMenu(expanded = overflowOpen, onDismissRequest = { overflowOpen = false }) { DropdownMenuItem(text = { Text(stringResource(R.string.drawing_information)) }, leadingIcon = { Icon(Icons.Default.Info, null) }, onClick = { overflowOpen = false; dialog = "info" }); DropdownMenuItem(text = { Text(stringResource(R.string.statistics)) }, leadingIcon = { Icon(UxIcons.Chart, null) }, onClick = { overflowOpen = false; dialog = "stats" }); DropdownMenuItem(text = { Text(stringResource(R.string.settings)) }, leadingIcon = { Icon(Icons.Default.Settings, null) }, onClick = { overflowOpen = false; settingsOpen = true }); DropdownMenuItem(text = { Text(stringResource(R.string.about)) }, leadingIcon = { Icon(UxIcons.Brand, null) }, onClick = { overflowOpen = false; dialog = "about" }) } } }, colors = TopAppBarDefaults.topAppBarColors(containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.96f)))
+            }
+        ) { padding ->
+            Box(Modifier.fillMaxSize().padding(padding)) {
+                AndroidView(factory = { context -> DrawingView(context).also { drawingView = it } }, update = { view ->
+                    if (view.model !== drawing) view.model = drawing
+                    val bg = if (dark) AndroidColor.rgb(11, 17, 22) else AndroidColor.rgb(247, 249, 250)
+                    val fg = if (dark) AndroidColor.rgb(224, 231, 235) else AndroidColor.rgb(20, 25, 31)
+                    view.setPalette(bg, fg, AndroidColor.rgb(0, 150, 199))
+                    view.onCanvasTap = { if (menuOpen) menuOpen = false }
+                    view.onFirstMeasurePoint = { runOnUiThread { measurement = getString(R.string.measurement_second) } }
+                    view.onMeasurement = { distance, unit, snapped -> runOnUiThread { measurement = formatDistance(distance, unit, snapped) } }
+                }, modifier = Modifier.fillMaxSize().semantics { contentDescription = getString(R.string.drawing_ready) })
 
-    private fun showStats(){val s=model?.stats?:return;val coverage=100.0*s.supportedEntities/s.graphicalEntities;val visibleCoverage=100.0*(s.visibleGraphicalEntities-s.unsupportedVisibleGraphicalEntities)/s.visibleGraphicalEntities;val unsupported=s.unsupportedByType.entries.sortedByDescending{it.value}.joinToString("\n"){"${it.key}: ${it.value}"};AlertDialog.Builder(this).setTitle("DWG statistics").setMessage("Objects: ${s.totalObjects}\nGraphical entities: ${s.graphicalEntities}\nVisible graphical entities: ${s.visibleGraphicalEntities}\nService objects: ${s.serviceObjects}\nStructural entities: ${s.structuralEntities}\nSupported entities: ${s.supportedEntities}\nRender primitives: ${s.renderPrimitiveCount}\nUnsupported graphical: ${s.unsupportedGraphicalEntities}\nUnsupported visible: ${s.unsupportedVisibleGraphicalEntities}\nGraphical coverage: ${"%.2f".format(Locale.US,coverage)}%\nVisible graphical coverage: ${"%.2f".format(Locale.US,visibleCoverage)}%\n\nUnsupported ranking:\n$unsupported").setPositiveButton("Close",null).show()}
+                Column(Modifier.align(Alignment.BottomEnd).navigationBarsPadding().padding(16.dp), horizontalAlignment = Alignment.End) {
+                    AnimatedVisibility(visible = menuOpen && !measuring, enter = fadeIn(tween(180)) + slideInVertically(tween(180)) { it / 3 }, exit = fadeOut(tween(150)) + slideOutVertically(tween(150)) { it / 3 }) {
+                        Column(verticalArrangement = Arrangement.spacedBy(10.dp), horizontalAlignment = Alignment.End) {
+                            MenuFab(UxIcons.Fit, stringResource(R.string.fit_drawing)) { drawingView?.fitToDrawing(); menuOpen = false }
+                            MenuFab(UxIcons.Ruler, stringResource(R.string.measure)) { drawingView?.startMeasurement(); measuring = true; measurement = getString(R.string.measurement_first); menuOpen = false }
+                            MenuFab(UxIcons.Layers, stringResource(R.string.layers)) { layersOpen = true; menuOpen = false }
+                            MenuFab(UxIcons.Folder, stringResource(R.string.open_drawing)) { menuOpen = false; openDocument() }
+                            Spacer(Modifier.height(2.dp))
+                        }
+                    }
+                    if (!measuring) FloatingActionButton(onClick = { menuOpen = !menuOpen }, shape = CircleShape, modifier = Modifier.size(56.dp).semantics { contentDescription = getString(R.string.main_menu) }) { Icon(if (menuOpen) Icons.Default.Close else UxIcons.Brand, null) }
+                }
 
-    private fun displayName(uri:Uri):String?{var cursor:Cursor?=null;return try{cursor=contentResolver.query(uri,arrayOf(OpenableColumns.DISPLAY_NAME),null,null,null);if(cursor?.moveToFirst()==true)cursor.getString(0)else null}finally{cursor?.close()}}
-    private fun recent():MutableList<Recent> = prefs.getString("recent","").orEmpty().split('\u001e').filter{it.contains('\u001f')}.map{val p=it.split('\u001f',limit=2);Recent(p[0],p[1])}.toMutableList()
-    private fun addRecent(uri:Uri,label:String){val items=recent();items.removeAll{it.uri==uri.toString()};items.add(0,Recent(uri.toString(),label));prefs.edit().putString("recent",items.take(10).joinToString("\u001e"){"${it.uri}\u001f${it.label}"}).apply()}
-    private fun showRecent(){val items=recent();if(items.isEmpty()){Toast.makeText(this,"No recent files",Toast.LENGTH_SHORT).show();return};AlertDialog.Builder(this).setTitle("Recent files").setItems(items.map{it.label}.toTypedArray()){_,which->val item=items[which];loadUri(Uri.parse(item.uri),item.label)}.setNegativeButton("Cancel",null).show()}
+                if (measuring) MeasurementPanel(Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(12.dp), measurement, onCancel = { drawingView?.cancelMeasurement(); measuring = false }, onClear = { drawingView?.startMeasurement(); measurement = getString(R.string.measurement_first) }, onDone = { drawingView?.cancelMeasurement(); measuring = false })
+            }
+        }
+        if (layersOpen) ModalBottomSheet(onDismissRequest = { layersOpen = false }) { Text(stringResource(R.string.layers), style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)); LazyColumn(Modifier.fillMaxWidth().heightIn(max = 560.dp).navigationBarsPadding()) { items(drawing.layers, key = { it.id }) { layer -> var checked by remember(layer.id) { mutableStateOf(drawingView?.isLayerVisible(layer.id) ?: layer.initiallyVisible) }; ListItem(headlineContent = { Text(layer.name, maxLines = 1, overflow = TextOverflow.Ellipsis) }, trailingContent = { Switch(checked = checked, onCheckedChange = { checked = it; drawingView?.setLayerVisible(layer.id, it) }, modifier = Modifier.semantics { contentDescription = getString(if (checked) R.string.layer_visible else R.string.layer_hidden, layer.name) }) }, modifier = Modifier.clickable { checked = !checked; drawingView?.setLayerVisible(layer.id, checked) }) } } }
+        dialog?.let { kind -> InfoDialog(kind, drawing) { dialog = null } }
+        if (settingsOpen) SettingsDialog(onDismiss = { settingsOpen = false })
+    }
 
-    companion object{private const val OPEN_DWG=1001}
+    @OptIn(ExperimentalMaterial3Api::class)
+    @Composable private fun MenuFab(icon: ImageVector, label: String, action: () -> Unit) { val state = rememberTooltipState(); TooltipBox(positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(), tooltip = { PlainTooltip { Text(label) } }, state = state) { SmallFloatingActionButton(onClick = action, modifier = Modifier.size(50.dp).semantics { contentDescription = label }, containerColor = MaterialTheme.colorScheme.surfaceContainerHigh) { Icon(icon, null) } } }
+
+    @Composable private fun MeasurementPanel(modifier: Modifier, value: String, onCancel: () -> Unit, onClear: () -> Unit, onDone: () -> Unit) { Surface(modifier, shape = RoundedCornerShape(22.dp), tonalElevation = 5.dp, color = MaterialTheme.colorScheme.surfaceContainerHigh) { Row(Modifier.padding(8.dp), verticalAlignment = Alignment.CenterVertically) { Icon(UxIcons.Ruler, stringResource(R.string.measurement_mode), tint = MaterialTheme.colorScheme.primary); Text(value, Modifier.padding(horizontal = 10.dp).weight(1f, fill = false), maxLines = 2); IconButton(onClick = onCancel) { Icon(Icons.Default.Close, stringResource(R.string.cancel)) }; IconButton(onClick = onClear) { Icon(Icons.Default.Delete, stringResource(R.string.clear)) }; FilledIconButton(onClick = onDone) { Icon(Icons.Default.Check, stringResource(R.string.done)) } } } }
+
+    @Composable private fun InfoDialog(kind: String, drawing: DrawingModel, dismiss: () -> Unit) { val title: String; val body: String; when (kind) { "stats" -> { title = stringResource(R.string.statistics); val s = drawing.stats; body = stringResource(R.string.stats_body, drawing.version, s.totalObjects, s.graphicalEntities, s.supportedEntities, formatNumber(100.0 * (s.visibleGraphicalEntities - s.unsupportedVisibleGraphicalEntities) / s.visibleGraphicalEntities, 2), s.renderPrimitiveCount) }; "about" -> { title = stringResource(R.string.about); body = stringResource(R.string.about_text) }; else -> { title = stringResource(R.string.drawing_information); body = stringResource(R.string.info_body, fileLabel, drawing.version, localizedUnitName(drawing.units), drawing.layers.size, drawing.stats.totalObjects) } }; AlertDialog(onDismissRequest = dismiss, title = { Text(title) }, text = { Text(body) }, confirmButton = { TextButton(onClick = dismiss) { Text(stringResource(R.string.close)) } }) }
+
+    @Composable private fun SettingsDialog(onDismiss: () -> Unit) { AlertDialog(onDismissRequest = onDismiss, title = { Text(stringResource(R.string.settings)) }, text = { Column { Text(stringResource(R.string.theme), style = MaterialTheme.typography.titleSmall); listOf(R.string.theme_system, R.string.theme_light, R.string.theme_dark).forEachIndexed { index, id -> Row(Modifier.fillMaxWidth().clickable { themeChoice = index; prefs.edit().putInt("theme", index).apply() }.padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) { RadioButton(selected = themeChoice == index, onClick = { themeChoice = index; prefs.edit().putInt("theme", index).apply() }); Text(stringResource(id)) } } } }, confirmButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.done)) } }) }
+
+    private fun openDocument() { val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply { addCategory(Intent.CATEGORY_OPENABLE); type = "*/*"; putExtra(Intent.EXTRA_MIME_TYPES, arrayOf("application/acad", "application/x-acad", "application/dwg", "image/vnd.dwg", "application/octet-stream")) }; startActivityForResult(intent, OPEN_DWG) }
+    @Deprecated("Activity result retained to keep the milestone dependency-free") override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) { super.onActivityResult(requestCode, resultCode, data); if (requestCode != OPEN_DWG || resultCode != Activity.RESULT_OK) return; val uri = data?.data ?: return; val label = displayName(uri) ?: "drawing.dwg"; if (!label.endsWith(".dwg", true)) { Toast.makeText(this, R.string.invalid_file, Toast.LENGTH_LONG).show(); return }; runCatching { contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION) }; addRecent(uri, label); loadUri(uri, label) }
+    private fun loadUri(uri: Uri, label: String) { loading = true; thread(name = "dwg-copy-parse") { try { val local = File(cacheDir, "opened_${uri.toString().hashCode()}.dwg"); contentResolver.openInputStream(uri).use { input -> requireNotNull(input); local.outputStream().use(input::copyTo) }; parse(local, label) } catch (t: Throwable) { showError(t) } } }
+    private fun loadPath(file: File, label: String) { loading = true; thread(name = "dwg-parser") { try { parse(file, label) } catch (t: Throwable) { showError(t) } } }
+    private fun parse(file: File, label: String) { val drawing = LibreDwgAdapter().read(file.absolutePath); val unsupported = drawing.stats.unsupportedByType.entries.sortedByDescending { it.value }.joinToString { "${it.key}=${it.value}" }; Log.i("BraginCAD", "file=$label version=${drawing.version} objects=${drawing.stats.totalObjects} graphical=${drawing.stats.graphicalEntities} visibleGraphical=${drawing.stats.visibleGraphicalEntities} service=${drawing.stats.serviceObjects} structural=${drawing.stats.structuralEntities} supported=${drawing.stats.supportedEntities} unsupportedGraphical=${drawing.stats.unsupportedGraphicalEntities} unsupportedVisible=${drawing.stats.unsupportedVisibleGraphicalEntities} coverage=${"%.2f".format(Locale.US, 100.0 * drawing.stats.supportedEntities / drawing.stats.graphicalEntities)}% visibleCoverage=${"%.2f".format(Locale.US, 100.0 * (drawing.stats.visibleGraphicalEntities - drawing.stats.unsupportedVisibleGraphicalEntities) / drawing.stats.visibleGraphicalEntities)}% primitives=${drawing.stats.renderPrimitiveCount} layers=${drawing.layers.size} units=${drawing.units} modelBuildMs=${drawing.parseMs} unsupportedRanking=[$unsupported]"); runOnUiThread { model = drawing; fileLabel = label; loading = false } }
+    private fun showError(t: Throwable) { Log.e("BraginCAD", "DWG open failed", t); runOnUiThread { loading = false; errorText = t.localizedMessage ?: getString(R.string.unable_open_drawing) } }
+    private fun formatDistance(value: Double, unit: DrawingUnit, snapped: Boolean): String { val (display, symbol) = when (unit) { DrawingUnit.MILLIMETERS -> if (value >= 1000) value / 1000.0 to getString(R.string.meters_short) else value to getString(R.string.millimeters_short); DrawingUnit.CENTIMETERS -> if (value >= 100) value / 100.0 to getString(R.string.meters_short) else value to getString(R.string.centimeters_short); DrawingUnit.METERS -> value to getString(R.string.meters_short); DrawingUnit.UNITLESS, DrawingUnit.UNKNOWN -> value to getString(R.string.drawing_units); else -> value to unit.symbol }; val suffix = if (snapped) " • ${getString(R.string.endpoint_snapped)}" else ""; return "${formatNumber(display, if (display < 10) 2 else 1)} $symbol$suffix" }
+    private fun localizedUnitName(unit:DrawingUnit):String=when(unit){DrawingUnit.MILLIMETERS->getString(R.string.unit_millimeters);DrawingUnit.CENTIMETERS->getString(R.string.unit_centimeters);DrawingUnit.METERS->getString(R.string.unit_meters);DrawingUnit.UNITLESS,DrawingUnit.UNKNOWN->getString(R.string.unit_unspecified);else->unit.symbol}
+    private fun formatNumber(value: Double, decimals: Int): String = NumberFormat.getNumberInstance(Locale("ru", "RU")).apply { maximumFractionDigits = decimals; minimumFractionDigits = 0; isGroupingUsed = true }.format(value)
+    private fun displayName(uri: Uri): String? { var cursor: Cursor? = null; return try { cursor = contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null); if (cursor?.moveToFirst() == true) cursor.getString(0) else null } finally { cursor?.close() } }
+    private fun recent(): MutableList<Recent> = prefs.getString("recent", "").orEmpty().split('\u001e').filter { it.contains('\u001f') }.map { val p = it.split('\u001f', limit = 2); Recent(p[0], p[1]) }.toMutableList()
+    private fun addRecent(uri: Uri, label: String) { val items = recent(); items.removeAll { it.uri == uri.toString() }; items.add(0, Recent(uri.toString(), label)); prefs.edit().putString("recent", items.take(10).joinToString("\u001e") { "${it.uri}\u001f${it.label}" }).apply() }
+    companion object { private const val OPEN_DWG = 1001 }
 }

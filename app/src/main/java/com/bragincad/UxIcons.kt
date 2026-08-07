@@ -1,0 +1,18 @@
+package com.bragincad
+
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.graphics.vector.path
+import androidx.compose.ui.unit.dp
+
+object UxIcons {
+    val Brand = icon("BraginCAD") { path(fill = SolidColor(Color.Black)) { moveTo(10f,2f);lineTo(14f,2f);lineTo(14f,5f);curveTo(17f,5.8f,19f,8.5f,19f,12f);curveTo(19f,14.4f,18f,16.4f,16.2f,17.7f);lineTo(18.5f,23f);lineTo(15.5f,24f);lineTo(13.3f,18.9f);curveTo(12.9f,19f,12.4f,19f,12f,19f);curveTo(11.6f,19f,11.1f,19f,10.7f,18.9f);lineTo(8.5f,24f);lineTo(5.5f,23f);lineTo(7.8f,17.7f);curveTo(6f,16.4f,5f,14.4f,5f,12f);curveTo(5f,8.5f,7f,5.8f,10f,5f);close();moveTo(12f,8f);curveTo(9.8f,8f,8f,9.8f,8f,12f);curveTo(8f,14.2f,9.8f,16f,12f,16f);curveTo(14.2f,16f,16f,14.2f,16f,12f);curveTo(16f,9.8f,14.2f,8f,12f,8f);close();moveTo(12f,10.5f);curveTo(12.8f,10.5f,13.5f,11.2f,13.5f,12f);curveTo(13.5f,12.8f,12.8f,13.5f,12f,13.5f);curveTo(11.2f,13.5f,10.5f,12.8f,10.5f,12f);curveTo(10.5f,11.2f,11.2f,10.5f,12f,10.5f);close() } }
+    val Folder = icon("Папка") { path(fill = SolidColor(Color.Black)) { moveTo(2f,5f);lineTo(10f,5f);lineTo(12f,7f);lineTo(22f,7f);lineTo(22f,20f);lineTo(2f,20f);close();moveTo(4f,9f);lineTo(4f,18f);lineTo(20f,18f);lineTo(20f,9f);close() } }
+    val Layers = icon("Слои") { path(fill = SolidColor(Color.Black)) { moveTo(12f,2f);lineTo(22f,8f);lineTo(12f,14f);lineTo(2f,8f);close();moveTo(2f,12f);lineTo(12f,18f);lineTo(22f,12f);lineTo(22f,16f);lineTo(12f,22f);lineTo(2f,16f);close() } }
+    val Ruler = icon("Линейка") { path(fill = SolidColor(Color.Black)) { moveTo(2f,7f);lineTo(22f,7f);lineTo(22f,18f);lineTo(2f,18f);close();moveTo(4f,10f);lineTo(4f,15f);lineTo(6f,15f);lineTo(6f,10f);close();moveTo(8f,10f);lineTo(8f,13f);lineTo(10f,13f);lineTo(10f,10f);close();moveTo(12f,10f);lineTo(12f,15f);lineTo(14f,15f);lineTo(14f,10f);close();moveTo(16f,10f);lineTo(16f,13f);lineTo(18f,13f);lineTo(18f,10f);close() } }
+    val Fit = icon("Показать целиком") { path(fill = SolidColor(Color.Black)) { moveTo(3f,3f);lineTo(10f,3f);lineTo(10f,6f);lineTo(6f,6f);lineTo(6f,10f);lineTo(3f,10f);close();moveTo(14f,3f);lineTo(21f,3f);lineTo(21f,10f);lineTo(18f,10f);lineTo(18f,6f);lineTo(14f,6f);close();moveTo(3f,14f);lineTo(6f,14f);lineTo(6f,18f);lineTo(10f,18f);lineTo(10f,21f);lineTo(3f,21f);close();moveTo(18f,14f);lineTo(21f,14f);lineTo(21f,21f);lineTo(14f,21f);lineTo(14f,18f);lineTo(18f,18f);close() } }
+    val Document = icon("Документ") { path(fill = SolidColor(Color.Black)) { moveTo(5f,2f);lineTo(15f,2f);lineTo(20f,7f);lineTo(20f,22f);lineTo(5f,22f);close();moveTo(14f,4f);lineTo(14f,8f);lineTo(18f,8f);close();moveTo(8f,12f);lineTo(17f,12f);lineTo(17f,14f);lineTo(8f,14f);close();moveTo(8f,17f);lineTo(17f,17f);lineTo(17f,19f);lineTo(8f,19f);close() } }
+    val Chart = icon("Статистика") { path(fill = SolidColor(Color.Black)) { moveTo(3f,20f);lineTo(3f,12f);lineTo(7f,12f);lineTo(7f,20f);close();moveTo(10f,20f);lineTo(10f,5f);lineTo(14f,5f);lineTo(14f,20f);close();moveTo(17f,20f);lineTo(17f,9f);lineTo(21f,9f);lineTo(21f,20f);close() } }
+    private fun icon(name:String, content: ImageVector.Builder.()->Unit):ImageVector=ImageVector.Builder(name,24.dp,24.dp,24f,24f).apply(content).build()
+}

@@ -11,6 +11,7 @@ class DrawingView(context:Context):View(context) {
     var model:DrawingModel?=null;set(value){field=value;visibleLayers=BooleanArray(value?.layers?.size?:0){i->value?.layers?.get(i)?.initiallyVisible?:true};fitPending=true;firstRenderPending=true;measureStart=null;measureEnd=null;invalidate()}
     var onMeasurement:((distance:Double,unit:DrawingUnit,snapped:Boolean)->Unit)?=null
     var onFirstMeasurePoint:(()->Unit)?=null
+    var onCanvasTap:(()->Unit)?=null
     private var visibleLayers=BooleanArray(0)
     private val paint=Paint(Paint.ANTI_ALIAS_FLAG).apply{color=Color.rgb(20,25,31);style=Paint.Style.STROKE;strokeWidth=1.2f}
     private val measurePaint=Paint(Paint.ANTI_ALIAS_FLAG).apply{color=Color.rgb(211,47,47);style=Paint.Style.STROKE;strokeWidth=3f}
@@ -19,6 +20,7 @@ class DrawingView(context:Context):View(context) {
     private var firstRenderPending=true
     private var measuring=false;private var measureStart:Point2?=null;private var measureEnd:Point2?=null;private var anySnapped=false
     private var lastX=0f;private var lastY=0f;private var moved=false
+    private var backgroundColor=Color.rgb(247,247,247)
     private val detector=ScaleGestureDetector(context,object:ScaleGestureDetector.SimpleOnScaleGestureListener(){
         override fun onScale(d:ScaleGestureDetector):Boolean{val old=scale;scale=(scale*d.scaleFactor).coerceIn(1e-5f,1e5f);tx=d.focusX-(d.focusX-tx)*scale/old;ty=d.focusY-(d.focusY-ty)*scale/old;invalidate();return true}
     })
@@ -28,11 +30,12 @@ class DrawingView(context:Context):View(context) {
     fun startMeasurement(){measuring=true;measureStart=null;measureEnd=null;anySnapped=false;invalidate()}
     fun cancelMeasurement(){measuring=false;measureStart=null;measureEnd=null;invalidate()}
     fun fitToDrawing(){fitPending=true;invalidate()}
+    fun setPalette(background:Int,foreground:Int,accent:Int){if(backgroundColor==background&&paint.color==foreground&&measurePaint.color==accent)return;backgroundColor=background;paint.color=foreground;textPaint.color=foreground;measurePaint.color=accent;invalidate()}
 
     override fun onTouchEvent(e:MotionEvent):Boolean{
         detector.onTouchEvent(e);if(detector.isInProgress)return true
         when(e.actionMasked){
-            MotionEvent.ACTION_DOWN->{lastX=e.x;lastY=e.y;moved=false}
+            MotionEvent.ACTION_DOWN->{onCanvasTap?.invoke();lastX=e.x;lastY=e.y;moved=false}
             MotionEvent.ACTION_MOVE->{val dx=e.x-lastX;val dy=e.y-lastY;if(abs(dx)+abs(dy)>3)moved=true;if(!measuring){tx+=dx;ty+=dy;invalidate()};lastX=e.x;lastY=e.y}
             MotionEvent.ACTION_UP->if(measuring&&!moved)selectMeasurePoint(e.x,e.y)
         };return true
@@ -57,7 +60,7 @@ class DrawingView(context:Context):View(context) {
         }};return best
     }
 
-    override fun onDraw(c:Canvas){val started=System.nanoTime();super.onDraw(c);c.drawColor(Color.rgb(247,247,247));val m=model?:return;if(fitPending){fit(m);fitPending=false};c.save();c.translate(tx,ty);c.scale(scale,-scale);paint.strokeWidth=1.2f/scale.coerceAtLeast(1e-5f);for(p in m.primitives)if(isLayerVisible(p.layerId)&&p !is Primitive.Text)draw(c,p);c.restore();drawTexts(c,m);drawMeasurement(c);if(firstRenderPending){firstRenderPending=false;Log.i("BraginCAD","firstRenderMs=${(System.nanoTime()-started)/1_000_000.0} primitives=${m.primitives.size}")}}
+    override fun onDraw(c:Canvas){val started=System.nanoTime();super.onDraw(c);c.drawColor(backgroundColor);val m=model?:return;if(fitPending){fit(m);fitPending=false};c.save();c.translate(tx,ty);c.scale(scale,-scale);paint.strokeWidth=1.2f/scale.coerceAtLeast(1e-5f);for(p in m.primitives)if(isLayerVisible(p.layerId)&&p !is Primitive.Text)draw(c,p);c.restore();drawTexts(c,m);drawMeasurement(c);if(firstRenderPending){firstRenderPending=false;Log.i("BraginCAD","firstRenderMs=${(System.nanoTime()-started)/1_000_000.0} primitives=${m.primitives.size}")}}
     private fun drawTexts(c:Canvas,m:DrawingModel){for(p in m.primitives){if(p !is Primitive.Text||!isLayerVisible(p.layerId)||p.height<=0.0)continue;val size=(p.height*scale).toFloat();if(size<0.35f)continue;textPaint.textSize=size;textPaint.textScaleX=p.widthFactor.toFloat().coerceIn(0.1f,10f);val lines=(if(p.multiline)cleanMtext(p.value)else p.value).split('\n');val horizontal=if(p.multiline)(p.horizontal-1).mod(3)else p.horizontal;val vertical=if(p.multiline)(p.horizontal-1)/3 else p.vertical;c.save();c.translate((tx+p.x*scale).toFloat(),(ty-p.y*scale).toFloat());c.rotate(-Math.toDegrees(p.rotation).toFloat());for((index,line)in lines.withIndex()){val width=textPaint.measureText(line);val x=when(horizontal){1->-width/2;2->-width;else->0f};val blockHeight=lines.size*size*1.2f*p.lineSpacing.toFloat();val origin=when(vertical){0->size;1->size+blockHeight/2;2->size+blockHeight;3->0f;else->0f};c.drawText(line,x,origin+index*size*1.2f*p.lineSpacing.toFloat(),textPaint)};c.restore()};textPaint.textScaleX=1f}
     private fun cleanMtext(raw:String):String{return raw.replace("\\P","\n").replace("\\~"," ").replace("%%d","°",true).replace(Regex("""\\S([^;]+);""")){it.groupValues[1].replace('#','/').replace('^','/')}.replace(Regex("""\\[ACFHQTW][^;]*;"""),"").replace(Regex("""\\[LlOoKk]"""),"").replace("{","").replace("}","")}
     private fun drawMeasurement(c:Canvas){val a=measureStart?:return;val b=measureEnd;val ax=(tx+a.x*scale).toFloat();val ay=(ty-a.y*scale).toFloat();c.drawCircle(ax,ay,8f,measurePaint);if(b!=null){val bx=(tx+b.x*scale).toFloat();val by=(ty-b.y*scale).toFloat();c.drawLine(ax,ay,bx,by,measurePaint);c.drawCircle(bx,by,8f,measurePaint)}}

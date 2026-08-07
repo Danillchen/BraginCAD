@@ -12,18 +12,20 @@
 
 ## Архитектура
 
-`LibreDwgAdapter` изолирует native parser. Результат преобразуется в собственные `Line`, `Polyline`, `Arc`, `Circle`, `Ellipse`, слои, единицы и статистику, после чего `DrawingView` отвечает за fit, pan, zoom, видимость и измерения. Переключение слоёв не вызывает повторный parsing. Такой разрез позволяет заменить parser и renderer независимо.
+`LibreDwgAdapter` изолирует native parser. Результат преобразуется в собственный `DrawingModel`, после чего неизменяемый `DrawingView` отвечает за fit, pan, zoom, видимость и измерения. Compose Material 3 управляет только лёгким UI-состоянием вокруг Android View renderer; раскрытие меню, смена темы и переключение слоёв не вызывают повторный parsing.
 
 Тестовый DWG копируется в assets только для regression/debug-сборки и не должен публиковаться. LibreDWG и производное приложение распространяются на условиях GPLv3+; текст лицензии находится в `third_party/libredwg/COPYING`.
 
-Проверено на Android 16 emulator: `test_01.dwg` (AC1024/DWG 2010) локально разобран, 25 838 примитивов отображены; pan и pinch zoom работают, критических ошибок Logcat нет.
+Проверено на Android 16 emulator: `test_01.dwg` (AC1024/DWG 2010), 43 485 render primitives, 97,41% visible graphical coverage; pan и pinch zoom работают, критических ошибок Logcat нет.
 
 ## Использование
 
-- `Open` открывает произвольный `.dwg` через системный Storage Access Framework.
-- `Layers` управляет видимостью 53 слоёв regression-файла без reparsing.
-- `Measure` выбирает две точки в координатах чертежа; endpoint snap активен автоматически, результат использует `INSUNITS` DWG.
-- `Recent` повторно открывает файлы по сохранённому `content://` URI.
+- «Открыть чертёж» использует системный Storage Access Framework.
+- Основные действия viewer находятся в вертикальном floating menu, чтобы чертёж занимал почти весь экран.
+- «Слои» открывает Material 3 bottom sheet и меняет видимость без reparsing.
+- «Измерить» включает компактный режим двух точек; Endpoint Snap активен автоматически, результат использует `INSUNITS` DWG.
+- «Недавние» повторно открывают файлы по сохранённому `content://` URI.
+- Светлая, тёмная и системная темы выбираются в настройках; ориентация меняется без повторного parsing.
 
 `test_01.dwg` определяет единицы как миллиметры (`INSUNITS=4`). Для unitless/unknown DWG интерфейс явно показывает `drawing units`, не предполагая миллиметры.
 
