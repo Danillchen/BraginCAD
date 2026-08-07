@@ -3,23 +3,25 @@ package com.bragincad.dwg
 import com.bragincad.model.*
 
 class LibreDwgAdapter : DwgReader {
-    external fun nativeRead(path: String): DoubleArray
-    override fun read(path: String): DrawingModel {
-        val started = System.nanoTime()
-        val raw = nativeRead(path)
-        require(raw.size >= 3) { "LibreDWG returned no metadata" }
-        val result = ArrayList<Primitive>(raw[1].toInt())
-        var i = 3
-        while (i < raw.size) when (raw[i++].toInt()) {
-            1 -> result += Primitive.Line(raw[i++], raw[i++], raw[i++], raw[i++])
-            2 -> result += Primitive.Circle(raw[i++], raw[i++], raw[i++])
-            3 -> result += Primitive.Arc(raw[i++], raw[i++], raw[i++], raw[i++], raw[i++])
-            4 -> { val n=raw[i++].toInt(); val closed=raw[i++] != 0.0; result += Primitive.Polyline(raw.copyOfRange(i, i+n*2), closed); i += n*2 }
-            5 -> result += Primitive.Ellipse(raw[i++], raw[i++], raw[i++], raw[i++], raw[i++], raw[i++], raw[i++])
-            else -> error("Unknown native primitive")
+    external fun nativeRead(path:String):Array<Any>
+    override fun read(path:String):DrawingModel {
+        val started=System.nanoTime();val payload=nativeRead(path)
+        val raw=payload[0] as DoubleArray;require(raw.size>=8){"LibreDWG returned no metadata"}
+        @Suppress("UNCHECKED_CAST") val names=payload[1] as Array<String>
+        val visible=payload[2] as BooleanArray
+        @Suppress("UNCHECKED_CAST") val typeLines=payload[3] as Array<String>
+        val result=ArrayList<Primitive>(raw[1].toInt());var i=8
+        while(i<raw.size)when(raw[i++].toInt()){
+            1->{val l=raw[i++].toInt();result+=Primitive.Line(l,raw[i++],raw[i++],raw[i++],raw[i++])}
+            2->{val l=raw[i++].toInt();result+=Primitive.Circle(l,raw[i++],raw[i++],raw[i++])}
+            3->{val l=raw[i++].toInt();result+=Primitive.Arc(l,raw[i++],raw[i++],raw[i++],raw[i++],raw[i++])}
+            4->{val l=raw[i++].toInt();val n=raw[i++].toInt();val closed=raw[i++]!=0.0;result+=Primitive.Polyline(l,raw.copyOfRange(i,i+n*2),closed);i+=n*2}
+            5->{val l=raw[i++].toInt();result+=Primitive.Ellipse(l,raw[i++],raw[i++],raw[i++],raw[i++],raw[i++],raw[i++],raw[i++])}
+            else->error("Unknown native primitive")
         }
-        return DrawingModel(result, "AC${raw[0].toInt()}", raw[2].toInt(), (System.nanoTime()-started)/1_000_000)
+        val byType=typeLines.associate{line->val split=line.lastIndexOf('=');line.substring(0,split) to line.substring(split+1).toInt()}
+        val stats=DrawingStats(raw[3].toInt(),raw[4].toInt(),raw[5].toInt(),raw[6].toInt(),raw[1].toInt(),raw[2].toInt(),byType)
+        return DrawingModel(result,names.mapIndexed{id,name->Layer(id,name,visible.getOrElse(id){true})},"AC${raw[0].toInt()}",DrawingUnit.fromCode(raw[7].toInt()),stats,(System.nanoTime()-started)/1_000_000)
     }
     companion object { init { System.loadLibrary("bragincad") } }
 }
-
