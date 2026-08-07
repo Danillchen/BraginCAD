@@ -1,0 +1,24 @@
+plugins {
+    id("com.android.application")
+    id("org.jetbrains.kotlin.android")
+}
+
+android {
+    namespace = "com.bragincad"
+    compileSdk = 36
+    ndkVersion = "30.0.15729638"
+
+    defaultConfig {
+        applicationId = "com.bragincad"
+        minSdk = 26
+        targetSdk = 36
+        versionCode = 1
+        versionName = "0.1.0"
+        externalNativeBuild { cmake { arguments += listOf("-DANDROID_STL=c++_static") } }
+        ndk { abiFilters += "x86_64" }
+    }
+    externalNativeBuild { cmake { path = file("src/main/cpp/CMakeLists.txt"); version = "4.1.2" } }
+    buildTypes { release { isMinifyEnabled = false } }
+    compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
+    kotlinOptions { jvmTarget = "17" }
+}
