@@ -21,6 +21,9 @@ data class DrawingStats(
     val structuralEntities:Int,
     val supportedEntities:Int,
     val unsupportedGraphicalEntities:Int,
+    val visibleGraphicalEntities:Int,
+    val unsupportedVisibleGraphicalEntities:Int,
+    val renderPrimitiveCount:Int,
     val byType:Map<String,Int>,
     val unsupportedByType:Map<String,Int>
 )
