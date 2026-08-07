@@ -20,6 +20,7 @@ class LibreDwgAdapter : DwgReader {
             5->{val l=raw[i++].toInt();result+=Primitive.Ellipse(l,raw[i++],raw[i++],raw[i++],raw[i++],raw[i++],raw[i++],raw[i++])}
             6->{val l=raw[i++].toInt();result+=Primitive.Text(l,raw[i++],raw[i++],raw[i++],raw[i++],texts[raw[i++].toInt()],raw[i++].toInt(),raw[i++].toInt(),raw[i++],false)}
             7->{val l=raw[i++].toInt();result+=Primitive.Text(l,raw[i++],raw[i++],raw[i++],raw[i++],texts[raw[i++].toInt()],raw[i++].toInt(),0,1.0,true,raw[i++],raw[i++])}
+            8->{val l=raw[i++].toInt();val solid=raw[i++]!=0.0;val contourCount=raw[i++].toInt();val contours=Array(contourCount){val n=raw[i++].toInt();raw.copyOfRange(i,i+n*2).also{i+=n*2}};val definitionCount=raw[i++].toInt();val definitions=Array(definitionCount){PatternLine(raw[i++],raw[i++],raw[i++],raw[i++],raw[i++],raw[i++])};result+=Primitive.Hatch(l,contours,solid,definitions)}
             else->error("Unknown native primitive")
         }
         fun stats(prefix:String)=typeLines.filter{it.startsWith(prefix)}.associate{line->val split=line.lastIndexOf('=');line.substring(prefix.length,split) to line.substring(split+1).toInt()}

@@ -9,8 +9,10 @@ sealed interface Primitive {
     data class Arc(override val layerId:Int,val cx:Double,val cy:Double,val radius:Double,val start:Double,val end:Double):Primitive
     data class Polyline(override val layerId:Int,val points:DoubleArray,val closed:Boolean):Primitive
     data class Ellipse(override val layerId:Int,val cx:Double,val cy:Double,val ax:Double,val ay:Double,val ratio:Double,val start:Double,val end:Double):Primitive
+    data class Hatch(override val layerId:Int,val contours:Array<DoubleArray>,val solid:Boolean,val patternLines:Array<PatternLine>):Primitive
     data class Text(override val layerId:Int,val x:Double,val y:Double,val height:Double,val rotation:Double,val value:String,val horizontal:Int,val vertical:Int,val widthFactor:Double,val multiline:Boolean,val boxWidth:Double=0.0,val lineSpacing:Double=1.0):Primitive
 }
+data class PatternLine(val px:Double,val py:Double,val dx:Double,val dy:Double,val ox:Double,val oy:Double)
 
 data class Layer(val id:Int,val name:String,val initiallyVisible:Boolean)
 

@@ -5,6 +5,11 @@
     <string name="no_recent_files">Недавних файлов нет</string>
     <string name="layers">Слои</string>
     <string name="measure">Измерить</string>
+    <string name="area">Площадь</string>
+    <string name="area_mode">Измерение площади</string>
+    <string name="area_points_needed">Точек: %1$d. Нужно минимум 3</string>
+    <string name="undo_point">Отменить точку</string>
+    <string name="square_drawing_units">кв. ед. чертежа</string>
     <string name="fit_drawing">Показать целиком</string>
     <string name="main_menu">Главное меню</string>
     <string name="more_options">Другие действия</string>
