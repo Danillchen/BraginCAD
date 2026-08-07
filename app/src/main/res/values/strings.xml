@@ -10,6 +10,8 @@
     <string name="area_points_needed">Точек: %1$d. Нужно минимум 3</string>
     <string name="undo_point">Отменить точку</string>
     <string name="square_drawing_units">кв. ед. чертежа</string>
+    <string name="hide_text">Скрыть текст</string>
+    <string name="show_text">Показать текст</string>
     <string name="fit_drawing">Показать целиком</string>
     <string name="main_menu">Главное меню</string>
     <string name="more_options">Другие действия</string>

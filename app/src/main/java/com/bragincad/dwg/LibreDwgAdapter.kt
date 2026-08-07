@@ -18,8 +18,8 @@ class LibreDwgAdapter : DwgReader {
             3->{val l=raw[i++].toInt();result+=Primitive.Arc(l,raw[i++],raw[i++],raw[i++],raw[i++],raw[i++])}
             4->{val l=raw[i++].toInt();val n=raw[i++].toInt();val closed=raw[i++]!=0.0;result+=Primitive.Polyline(l,raw.copyOfRange(i,i+n*2),closed);i+=n*2}
             5->{val l=raw[i++].toInt();result+=Primitive.Ellipse(l,raw[i++],raw[i++],raw[i++],raw[i++],raw[i++],raw[i++],raw[i++])}
-            6->{val l=raw[i++].toInt();result+=Primitive.Text(l,raw[i++],raw[i++],raw[i++],raw[i++],texts[raw[i++].toInt()],raw[i++].toInt(),raw[i++].toInt(),raw[i++],false)}
-            7->{val l=raw[i++].toInt();result+=Primitive.Text(l,raw[i++],raw[i++],raw[i++],raw[i++],texts[raw[i++].toInt()],raw[i++].toInt(),0,1.0,true,raw[i++],raw[i++])}
+            6->{val l=raw[i++].toInt();val x=raw[i++];val y=raw[i++];val h=raw[i++];val r=raw[i++];val value=texts[raw[i++].toInt()];val ha=raw[i++].toInt();val va=raw[i++].toInt();val width=raw[i++];val style=texts[raw[i++].toInt()];val font=texts[raw[i++].toInt()];val styleWidth=raw[i++];val oblique=raw[i++];result+=Primitive.Text(l,x,y,h,r,value,ha,va,width,false,styleName=style,fontName=font,styleWidthFactor=styleWidth,oblique=oblique)}
+            7->{val l=raw[i++].toInt();val x=raw[i++];val y=raw[i++];val h=raw[i++];val r=raw[i++];val value=texts[raw[i++].toInt()];val attachment=raw[i++].toInt();val box=raw[i++];val spacing=raw[i++];val style=texts[raw[i++].toInt()];val font=texts[raw[i++].toInt()];val styleWidth=raw[i++];val oblique=raw[i++];result+=Primitive.Text(l,x,y,h,r,value,attachment,0,1.0,true,box,spacing,style,font,styleWidth,oblique)}
             8->{val l=raw[i++].toInt();val solid=raw[i++]!=0.0;val contourCount=raw[i++].toInt();val contours=Array(contourCount){val n=raw[i++].toInt();raw.copyOfRange(i,i+n*2).also{i+=n*2}};val definitionCount=raw[i++].toInt();val definitions=Array(definitionCount){PatternLine(raw[i++],raw[i++],raw[i++],raw[i++],raw[i++],raw[i++])};result+=Primitive.Hatch(l,contours,solid,definitions)}
             else->error("Unknown native primitive")
         }

@@ -116,6 +116,7 @@ class MainActivity : ComponentActivity() {
         var layersOpen by remember { mutableStateOf(false) }
         var measuring by remember { mutableStateOf(false) }
         var areaMode by remember { mutableStateOf(false) }
+        var textHidden by remember { mutableStateOf(false) }
         var measurement by remember { mutableStateOf(getString(R.string.measurement_first)) }
         var overflowOpen by remember { mutableStateOf(false) }
         var dialog by remember { mutableStateOf<String?>(null) }
@@ -146,6 +147,7 @@ class MainActivity : ComponentActivity() {
                             MenuFab(UxIcons.Fit, stringResource(R.string.fit_drawing)) { drawingView?.fitToDrawing(); menuOpen = false }
                             MenuFab(UxIcons.Ruler, stringResource(R.string.measure)) { drawingView?.startMeasurement(); measuring = true; measurement = getString(R.string.measurement_first); menuOpen = false }
                             MenuFab(UxIcons.Area, stringResource(R.string.area)) { drawingView?.startArea(); measuring = true; areaMode=true;measurement=getString(R.string.area_points_needed,0);menuOpen=false }
+                            MenuFab(UxIcons.TextVisibility, stringResource(if(textHidden)R.string.show_text else R.string.hide_text)) { textHidden=!textHidden;drawingView?.setTextVisible(!textHidden);menuOpen=false }
                             MenuFab(UxIcons.Layers, stringResource(R.string.layers)) { layersOpen = true; menuOpen = false }
                             MenuFab(UxIcons.Folder, stringResource(R.string.open_drawing)) { menuOpen = false; openDocument() }
                             Spacer(Modifier.height(2.dp))
