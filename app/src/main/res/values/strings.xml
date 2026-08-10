@@ -50,6 +50,16 @@
     <string name="measurement_precision">Точность измерений</string>
     <string name="decimal_places">Знаков после запятой: %1$d</string>
     <string name="about_text">BraginCAD — автономный мобильный просмотрщик строительных DWG.</string>
+    <string name="app_purpose">Просмотр и измерение DWG-чертежей</string>
+    <string name="developer_label">Разработчик</string>
+    <string name="developer_name">Брагин Данила</string>
+    <string name="app_version">Версия: %1$s</string>
+    <string name="purpose_label">Назначение</string>
+    <string name="offline_note">BraginCAD работает локально и не требует подключения к Интернету.</string>
+    <string name="licenses">Лицензии</string>
+    <string name="software_used">Используемое ПО</string>
+    <string name="libredwg_license_summary">GNU LibreDWG\nЛицензия: GPLv3+</string>
+    <string name="libredwg_license_title">GNU LibreDWG — GPLv3+</string>
     <string name="layer_visible">Слой %1$s включён</string>
     <string name="layer_hidden">Слой %1$s выключен</string>
     <string name="loading_drawing">Загрузка чертежа…</string>

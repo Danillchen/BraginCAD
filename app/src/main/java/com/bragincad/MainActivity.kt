@@ -18,6 +18,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.*
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -33,6 +34,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
@@ -102,10 +104,11 @@ class MainActivity : ComponentActivity() {
     private fun StartScreen() {
         val recentItems = remember(model, loading) { recent() }
         var settingsOpen by remember { mutableStateOf(false) }
+        var aboutOpen by remember { mutableStateOf(false) }
         Scaffold(contentWindowInsets=WindowInsets.safeDrawing,topBar={TopAppBar(title={Text(stringResource(R.string.app_name),style=MaterialTheme.typography.titleLarge)},actions={IconButton(onClick={settingsOpen=true}){Icon(Icons.Default.Settings,stringResource(R.string.settings))}},colors=TopAppBarDefaults.topAppBarColors(containerColor=MaterialTheme.colorScheme.background))}) { padding ->
             Column(Modifier.fillMaxSize().padding(padding).padding(horizontal=BraginSpacing.XLarge)) {
                 Spacer(Modifier.height(BraginSpacing.XLarge))
-                Row(verticalAlignment=Alignment.CenterVertically){Surface(shape=RoundedCornerShape(BraginRadii.Large),color=MaterialTheme.colorScheme.primaryContainer,modifier=Modifier.size(56.dp)){Icon(UxIcons.Brand,null,Modifier.padding(14.dp),tint=MaterialTheme.colorScheme.onPrimaryContainer)};Spacer(Modifier.width(BraginSpacing.Large));Column{Text(stringResource(R.string.app_name),style=MaterialTheme.typography.headlineSmall);Text(stringResource(R.string.about_text),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant,maxLines=1,overflow=TextOverflow.Ellipsis)}}
+                Row(verticalAlignment=Alignment.CenterVertically){Surface(shape=RoundedCornerShape(BraginRadii.Large),color=MaterialTheme.colorScheme.primaryContainer,modifier=Modifier.size(64.dp)){Image(painterResource(R.drawable.ic_bragincad_foreground),null,Modifier.padding(5.dp))};Spacer(Modifier.width(BraginSpacing.Large));Column{Text(stringResource(R.string.app_name),style=MaterialTheme.typography.headlineSmall);Text(stringResource(R.string.about_text),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant,maxLines=2,overflow=TextOverflow.Ellipsis)}}
                 Spacer(Modifier.height(BraginSpacing.XLarge))
                 Button(onClick=::openDocument,enabled=!loading,modifier=Modifier.fillMaxWidth().heightIn(min=52.dp),shape=RoundedCornerShape(BraginRadii.Medium)){if(loading)CircularProgressIndicator(Modifier.size(20.dp),strokeWidth=2.dp)else Icon(UxIcons.Folder,null);Spacer(Modifier.width(BraginSpacing.Medium));Text(if(loading)stringResource(R.string.loading_drawing) else stringResource(R.string.open_drawing))}
                 Spacer(Modifier.height(32.dp));Text(stringResource(R.string.recent),style=MaterialTheme.typography.titleMedium)
@@ -114,7 +117,8 @@ class MainActivity : ComponentActivity() {
                 else LazyColumn(Modifier.fillMaxWidth().weight(1f)){items(recentItems,key={it.uri}){item->ListItem(headlineContent={Text(item.label,maxLines=1,overflow=TextOverflow.Ellipsis)},leadingContent={Icon(UxIcons.Document,null,tint=MaterialTheme.colorScheme.primary)},colors=ListItemDefaults.colors(containerColor=MaterialTheme.colorScheme.background),modifier=Modifier.clickable{openDrawing(Uri.parse(item.uri),item.label,false)});HorizontalDivider(color=MaterialTheme.colorScheme.outlineVariant)}}
             }
         }
-        if(settingsOpen)SettingsDialog{settingsOpen=false}
+        if(settingsOpen)SettingsDialog(onDismiss={settingsOpen=false},onAbout={settingsOpen=false;aboutOpen=true})
+        if(aboutOpen)AboutDialog{aboutOpen=false}
     }
 
     @OptIn(ExperimentalMaterial3Api::class)
@@ -181,7 +185,7 @@ class MainActivity : ComponentActivity() {
                             Spacer(Modifier.height(2.dp))
                         }
                     }
-                    if (!measuring) FloatingActionButton(onClick = { menuOpen = !menuOpen }, shape = CircleShape, modifier = Modifier.size(56.dp).semantics { contentDescription = getString(R.string.main_menu) }) { Icon(if (menuOpen) Icons.Default.Close else UxIcons.Brand, null) }
+                    if (!measuring) FloatingActionButton(onClick = { menuOpen = !menuOpen }, shape = CircleShape, modifier = Modifier.size(56.dp).semantics { contentDescription = getString(R.string.main_menu) }) { Icon(painterResource(R.drawable.ic_bragincad_mark), null, Modifier.size(30.dp), tint=MaterialTheme.colorScheme.onPrimaryContainer) }
                 }
 
                 if(!renderReady)Surface(Modifier.align(Alignment.Center),shape=RoundedCornerShape(BraginRadii.Large),color=MaterialTheme.colorScheme.surfaceContainerHigh,border=BorderStroke(1.dp,MaterialTheme.colorScheme.outlineVariant),tonalElevation=3.dp){Row(Modifier.padding(horizontal=BraginSpacing.Large,vertical=BraginSpacing.Medium),verticalAlignment=Alignment.CenterVertically){CircularProgressIndicator(Modifier.size(22.dp),strokeWidth=2.dp);Spacer(Modifier.width(BraginSpacing.Medium));Text(stringResource(R.string.loading_drawing))}}
@@ -191,8 +195,8 @@ class MainActivity : ComponentActivity() {
             }
         }
         if (layersOpen) ModalBottomSheet(onDismissRequest = { layersOpen = false }) { Text(stringResource(R.string.layers), style = MaterialTheme.typography.headlineSmall, modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp)); LazyColumn(Modifier.fillMaxWidth().heightIn(max = 560.dp).navigationBarsPadding()) { items(drawing.layers, key = { it.id }) { layer -> var checked by remember(layer.id) { mutableStateOf(drawingView?.isLayerVisible(layer.id) ?: layer.initiallyVisible) }; ListItem(headlineContent = { Text(layer.name, maxLines = 1, overflow = TextOverflow.Ellipsis) }, trailingContent = { Switch(checked = checked, onCheckedChange = { checked = it; drawingView?.setLayerVisible(layer.id, it) }, modifier = Modifier.semantics { contentDescription = getString(if (checked) R.string.layer_visible else R.string.layer_hidden, layer.name) }) }, modifier = Modifier.clickable { checked = !checked; drawingView?.setLayerVisible(layer.id, checked) }) } } }
-        dialog?.let { kind -> InfoDialog(kind, drawing) { dialog = null } }
-        if (settingsOpen) SettingsDialog(onDismiss = { settingsOpen = false })
+        dialog?.let { kind -> if(kind=="about") AboutDialog { dialog=null } else InfoDialog(kind, drawing) { dialog = null } }
+        if (settingsOpen) SettingsDialog(onDismiss = { settingsOpen = false },onAbout={settingsOpen=false;dialog="about"})
     }
 
     @OptIn(ExperimentalMaterial3Api::class)
@@ -202,9 +206,17 @@ class MainActivity : ComponentActivity() {
 
     @Composable private fun CoordinatePanel(modifier:Modifier,point:Point2?,z:Double?,snapped:Boolean,unit:DrawingUnit,decimalPlaces:Int,onCopy:(Point2)->Unit,onClose:()->Unit){Surface(modifier,shape=RoundedCornerShape(BraginRadii.Floating),tonalElevation=4.dp,shadowElevation=4.dp,border=BorderStroke(1.dp,MaterialTheme.colorScheme.outlineVariant),color=MaterialTheme.colorScheme.surfaceContainerHigh){Row(Modifier.padding(BraginSpacing.Medium),verticalAlignment=Alignment.CenterVertically){Icon(UxIcons.Coordinates,stringResource(R.string.coordinates),tint=MaterialTheme.colorScheme.primary);Column(Modifier.padding(horizontal=BraginSpacing.Medium).weight(1f,false)){Text(if(point==null)stringResource(R.string.coordinate_tap) else "X: ${formatNumber(point.x,decimalPlaces,true)}\nY: ${formatNumber(point.y,decimalPlaces,true)}"+(z?.let{"\nZ: ${formatNumber(it,decimalPlaces,true)}"}?:""),maxLines=3);if(point!=null)Text((if(snapped)stringResource(R.string.endpoint_snapped)+" · " else "")+stringResource(R.string.coordinate_units,localizedUnitName(unit)),style=MaterialTheme.typography.labelSmall)};if(point!=null)TextButton(onClick={onCopy(point)}){Text(stringResource(R.string.copy))};IconButton(onClick=onClose){Icon(Icons.Default.Close,stringResource(R.string.close))}}}}
 
-    @Composable private fun InfoDialog(kind: String, drawing: DrawingModel, dismiss: () -> Unit) { val title: String; val body: String; when (kind) { "stats" -> { title = stringResource(R.string.statistics); val s = drawing.stats; body = stringResource(R.string.stats_body, drawing.version, s.totalObjects, s.graphicalEntities, s.supportedEntities, formatNumber(100.0 * (s.visibleGraphicalEntities - s.unsupportedVisibleGraphicalEntities) / s.visibleGraphicalEntities, 2), s.renderPrimitiveCount) }; "about" -> { title = stringResource(R.string.about); body = stringResource(R.string.about_text) }; else -> { title = stringResource(R.string.drawing_information); body = stringResource(R.string.info_body, fileLabel, drawing.version, localizedUnitName(drawing.units), drawing.layers.size, drawing.stats.totalObjects) } }; AlertDialog(onDismissRequest = dismiss, title = { Text(title) }, text = { Text(body) }, confirmButton = { TextButton(onClick = dismiss) { Text(stringResource(R.string.close)) } }) }
+    @Composable private fun InfoDialog(kind: String, drawing: DrawingModel, dismiss: () -> Unit) { val title: String; val body: String; when (kind) { "stats" -> { title = stringResource(R.string.statistics); val s = drawing.stats; body = stringResource(R.string.stats_body, drawing.version, s.totalObjects, s.graphicalEntities, s.supportedEntities, formatNumber(100.0 * (s.visibleGraphicalEntities - s.unsupportedVisibleGraphicalEntities) / s.visibleGraphicalEntities, 2), s.renderPrimitiveCount) }; else -> { title = stringResource(R.string.drawing_information); body = stringResource(R.string.info_body, fileLabel, drawing.version, localizedUnitName(drawing.units), drawing.layers.size, drawing.stats.totalObjects) } }; AlertDialog(onDismissRequest = dismiss, title = { Text(title) }, text = { Text(body) }, confirmButton = { TextButton(onClick = dismiss) { Text(stringResource(R.string.close)) } }) }
 
-    @Composable private fun SettingsDialog(onDismiss: () -> Unit) {
+    @Composable private fun AboutDialog(dismiss:()->Unit){
+        val context=LocalContext.current
+        val version=remember(context){runCatching{context.packageManager.getPackageInfo(context.packageName,0).versionName}.getOrNull().orEmpty().ifBlank{"—"}}
+        var licenseOpen by remember{mutableStateOf(false)}
+        AlertDialog(onDismissRequest=dismiss,title={Row(verticalAlignment=Alignment.CenterVertically){Image(painterResource(R.drawable.ic_bragincad_foreground),null,Modifier.size(44.dp));Spacer(Modifier.width(BraginSpacing.Medium));Text(stringResource(R.string.app_name))}},text={Column(verticalArrangement=Arrangement.spacedBy(BraginSpacing.Medium)){Text(stringResource(R.string.app_version,version),style=MaterialTheme.typography.bodyMedium);Column{Text(stringResource(R.string.developer_label),style=MaterialTheme.typography.labelMedium,color=MaterialTheme.colorScheme.onSurfaceVariant);Text(stringResource(R.string.developer_name),style=MaterialTheme.typography.bodyLarge)};Column{Text(stringResource(R.string.purpose_label),style=MaterialTheme.typography.labelMedium,color=MaterialTheme.colorScheme.onSurfaceVariant);Text(stringResource(R.string.app_purpose))};HorizontalDivider();Text(stringResource(R.string.offline_note),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant);TextButton(onClick={licenseOpen=true},contentPadding=PaddingValues(0.dp)){Text(stringResource(R.string.licenses))}}},confirmButton={TextButton(onClick=dismiss){Text(stringResource(R.string.close))}})
+        if(licenseOpen){val licenseText=remember{context.resources.openRawResource(R.raw.libredwg_gpl_v3).bufferedReader().use{it.readText()}};AlertDialog(onDismissRequest={licenseOpen=false},title={Text(stringResource(R.string.libredwg_license_title))},text={LazyColumn(Modifier.heightIn(max=460.dp)){item{Text(stringResource(R.string.software_used),style=MaterialTheme.typography.titleSmall);Text(stringResource(R.string.libredwg_license_summary),Modifier.padding(top=BraginSpacing.Small,bottom=BraginSpacing.Large));Text(licenseText,style=MaterialTheme.typography.bodySmall)}}},confirmButton={TextButton(onClick={licenseOpen=false}){Text(stringResource(R.string.close))}})}
+    }
+
+    @Composable private fun SettingsDialog(onDismiss: () -> Unit,onAbout:()->Unit) {
         val appSettings by settingsRepository.settings
         AlertDialog(onDismissRequest=onDismiss,title={Text(stringResource(R.string.settings))},text={
             Column {
@@ -221,6 +233,8 @@ class MainActivity : ComponentActivity() {
                         RadioButton(selected=appSettings.theme==index,onClick={settingsRepository.setTheme(index)});Text(stringResource(id))
                     }
                 }
+                HorizontalDivider(Modifier.padding(vertical=16.dp))
+                ListItem(headlineContent={Text(stringResource(R.string.about))},leadingContent={Icon(painterResource(R.drawable.ic_bragincad_mark),null,Modifier.size(24.dp))},modifier=Modifier.clickable(onClick=onAbout),colors=ListItemDefaults.colors(containerColor=MaterialTheme.colorScheme.surfaceContainerHigh))
             }
         },confirmButton={TextButton(onClick=onDismiss){Text(stringResource(R.string.done))}})
     }
