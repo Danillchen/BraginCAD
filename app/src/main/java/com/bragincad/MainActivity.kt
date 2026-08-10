@@ -53,6 +53,7 @@ class MainActivity : ComponentActivity() {
     private var fileLabel by mutableStateOf("")
     private var loading by mutableStateOf(false)
     private var errorText by mutableStateOf<String?>(null)
+    private var regressionStressStarted=false
     private var themeChoice by mutableIntStateOf(0)
     private var drawingView: DrawingView? = null
     private val prefs by lazy { getSharedPreferences("bragincad", MODE_PRIVATE) }
@@ -132,7 +133,7 @@ class MainActivity : ComponentActivity() {
             Box(Modifier.fillMaxSize().padding(padding)) {
                 AndroidView(factory = { context -> DrawingView(context).also { drawingView = it } }, update = { view ->
                     view.onRenderModelReady = { ms -> DwgOpenDiagnostics.stage("08_RENDER_MODEL_END","buildMs=$ms") }
-                    view.onFirstRender = { ms -> DwgOpenDiagnostics.stage("10_FIRST_RENDER_END","renderMs=$ms") }
+                    view.onFirstRender = { ms -> DwgOpenDiagnostics.stage("10_FIRST_RENDER_END","renderMs=$ms");if(intent.getBooleanExtra("regression_stress",false)&&!regressionStressStarted){regressionStressStarted=true;view.startPerformanceStress()} }
                     if (view.model !== drawing) view.model = drawing
                     val bg = if (dark) AndroidColor.rgb(11, 17, 22) else AndroidColor.rgb(247, 249, 250)
                     val fg = if (dark) AndroidColor.rgb(224, 231, 235) else AndroidColor.rgb(20, 25, 31)

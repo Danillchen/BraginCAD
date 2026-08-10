@@ -39,14 +39,35 @@ function Match-Value([string]$text, [string]$pattern) {
     return $match.Groups[1].Value
 }
 
+function Wait-AdbDevice([int]$Seconds = 30) {
+    $deadline = [DateTime]::UtcNow.AddSeconds($Seconds)
+    do {
+        $line = (& $adb devices 2>&1 | Select-String "^$([regex]::Escape($Device))\s+device$")
+        if ($line) { return $true }
+        & $adb reconnect offline 2>&1 | Out-Null
+        Start-Sleep -Seconds 2
+    } until ([DateTime]::UtcNow -gt $deadline)
+    return $false
+}
+
+function Push-WithRetry([string]$Local, [string]$Remote) {
+    for ($attempt = 1; $attempt -le 3; $attempt++) {
+        if ((Wait-AdbDevice 30)) {
+            & $adb -s $Device push $Local $Remote | Out-Null
+            if ($LASTEXITCODE -eq 0) { return }
+        }
+        Write-Warning "ADB push attempt $attempt failed; reconnecting transport"
+    }
+    throw "Cannot push $Local after 3 transport retries"
+}
+
 $caseIndex = 0
 $results = foreach ($file in $files) {
     $caseIndex++
     Write-Host "Running $($file.Name)..."
     $caseName = "case-$caseIndex.dwg"
     $remoteFile = "/data/local/tmp/bragincad-$caseName"
-    & $adb -s $Device push $file.FullName $remoteFile | Out-Null
-    if ($LASTEXITCODE) { throw "Cannot push $($file.Name)" }
+    Push-WithRetry $file.FullName $remoteFile
     & $adb -s $Device shell run-as com.bragincad mkdir -p files/regression | Out-Null
     & $adb -s $Device shell run-as com.bragincad cp $remoteFile "files/regression/$caseName" | Out-Null
     if ($LASTEXITCODE) { throw "Cannot stage $($file.Name) in app storage" }
@@ -66,7 +87,7 @@ $results = foreach ($file in $files) {
     $appLine = ([regex]::Matches($log, "(?m)^.*BraginCAD\(.*file=$([regex]::Escape($caseName)) .*$") | Select-Object -Last 1).Value
     $nativeLine = ([regex]::Matches($log, "(?m)^.*BraginCADNative\(.*decoded objects=.*$") | Select-Object -Last 1).Value
     $timingLine = ([regex]::Matches($log, "(?m)^.*BraginCADNative\(.*timing decode_ms=.*$") | Select-Object -Last 1).Value
-    $renderLine = ([regex]::Matches($log, "(?m)^.*BraginCAD\(.*firstRenderMs=.*$") | Select-Object -Last 1).Value
+    $renderLine = ([regex]::Matches($log, "(?m)^.*BraginCADRender\(.*firstRenderMs=.*$") | Select-Object -Last 1).Value
     $meminfo = (& $adb -s $Device shell dumpsys meminfo com.bragincad 2>&1) -join "`n"
     $pss = Match-Value $meminfo "TOTAL PSS:\s+(\d+)"
     $unsupported = Match-Value $appLine "unsupportedRanking=\[(.*)\]"
@@ -94,6 +115,12 @@ $results = foreach ($file in $files) {
     $log | Set-Content -LiteralPath (Join-Path $outputPath "$($file.BaseName).log") -Encoding utf8
     (& $adb -s $Device exec-out run-as com.bragincad cat cache/dwg-open-debug.json 2>&1) -join "`n" | Set-Content -LiteralPath (Join-Path $outputPath "$($file.BaseName)-open-debug.json") -Encoding utf8
     (& $adb -s $Device exec-out run-as com.bragincad cat cache/dwg-open-native.log 2>&1) -join "`n" | Set-Content -LiteralPath (Join-Path $outputPath "$($file.BaseName)-native.log") -Encoding utf8
+    if ($complete -and (Wait-AdbDevice 10)) {
+        $remoteScreenshot = "/data/local/tmp/bragincad-$caseIndex.png"
+        & $adb -s $Device shell screencap -p $remoteScreenshot | Out-Null
+        & $adb -s $Device pull $remoteScreenshot (Join-Path $outputPath "$($file.BaseName).png") | Out-Null
+        & $adb -s $Device shell rm $remoteScreenshot | Out-Null
+    }
 }
 
 $timestamp = Get-Date -Format "yyyyMMdd-HHmmss"
