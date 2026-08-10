@@ -2,6 +2,7 @@ package com.bragincad
 
 import android.app.Activity
 import android.content.*
+import android.content.res.Configuration
 import android.content.pm.ApplicationInfo
 import android.database.Cursor
 import android.graphics.Color as AndroidColor
@@ -23,6 +24,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -33,6 +36,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.semantics.contentDescription
@@ -146,6 +150,7 @@ class MainActivity : ComponentActivity() {
         var dialog by remember { mutableStateOf<String?>(null) }
         var settingsOpen by remember { mutableStateOf(false) }
         val drawing = model ?: return
+        val landscape=LocalConfiguration.current.orientation==Configuration.ORIENTATION_LANDSCAPE
         var renderReady by remember(drawing) { mutableStateOf(false) }
         val measurement = when {
             measuredDistance != null -> formatDistance(measuredDistance!!, measuredUnit, measurementSnapped, measurementDecimalPlaces)
@@ -177,7 +182,15 @@ class MainActivity : ComponentActivity() {
 
                 if(renderReady)Column(Modifier.align(Alignment.BottomEnd).navigationBarsPadding().padding(16.dp), horizontalAlignment = Alignment.End) {
                     AnimatedVisibility(visible = menuOpen && !measuring, enter = fadeIn(tween(180)) + slideInVertically(tween(180)) { it / 3 }, exit = fadeOut(tween(150)) + slideOutVertically(tween(150)) { it / 3 }) {
-                        Column(verticalArrangement = Arrangement.spacedBy(10.dp), horizontalAlignment = Alignment.End) {
+                        if(landscape)Row(horizontalArrangement=Arrangement.spacedBy(10.dp),verticalAlignment=Alignment.CenterVertically){
+                            MenuFab(UxIcons.Fit, stringResource(R.string.fit_drawing)) { drawingView?.fitToDrawing(); menuOpen = false }
+                            MenuFab(UxIcons.Ruler, stringResource(R.string.measure)) { drawingView?.startMeasurement(); measuring=true;areaMode=false;coordinateMode=false;measuredDistance=null;measuredArea=null;measurementPrompt=getString(R.string.measurement_first);menuOpen=false }
+                            MenuFab(UxIcons.Area, stringResource(R.string.area)) { drawingView?.startArea();measuring=true;areaMode=true;coordinateMode=false;measuredDistance=null;measuredArea=null;areaPoints=0;measurementPrompt=getString(R.string.area_points_needed,0);menuOpen=false }
+                            MenuFab(UxIcons.Coordinates, stringResource(R.string.coordinates)) { drawingView?.startCoordinates();measuring=true;areaMode=false;coordinateMode=true;coordinatePoint=null;coordinateZ=null;menuOpen=false }
+                            MenuFab(UxIcons.TextVisibility, stringResource(if(textHidden)R.string.show_text else R.string.hide_text)) { textHidden=!textHidden;drawingView?.setTextVisible(!textHidden);menuOpen=false }
+                            MenuFab(UxIcons.Layers, stringResource(R.string.layers)) { layersOpen = true; menuOpen = false }
+                            MenuFab(UxIcons.Folder, stringResource(R.string.open_drawing)) { menuOpen = false; openDocument() }
+                        }else Column(verticalArrangement = Arrangement.spacedBy(10.dp), horizontalAlignment = Alignment.End) {
                             MenuFab(UxIcons.Fit, stringResource(R.string.fit_drawing)) { drawingView?.fitToDrawing(); menuOpen = false }
                             MenuFab(UxIcons.Ruler, stringResource(R.string.measure)) { drawingView?.startMeasurement(); measuring=true;areaMode=false;coordinateMode=false;measuredDistance=null;measuredArea=null;measurementPrompt=getString(R.string.measurement_first);menuOpen=false }
                             MenuFab(UxIcons.Area, stringResource(R.string.area)) { drawingView?.startArea();measuring=true;areaMode=true;coordinateMode=false;measuredDistance=null;measuredArea=null;areaPoints=0;measurementPrompt=getString(R.string.area_points_needed,0);menuOpen=false }
@@ -222,7 +235,7 @@ class MainActivity : ComponentActivity() {
     @Composable private fun SettingsDialog(onDismiss: () -> Unit,onAbout:()->Unit) {
         val appSettings by settingsRepository.settings
         AlertDialog(onDismissRequest=onDismiss,title={Text(stringResource(R.string.settings))},text={
-            Column {
+            Column(Modifier.verticalScroll(rememberScrollState())) {
                 Text(stringResource(R.string.measurements_settings),style=MaterialTheme.typography.titleSmall)
                 Text(stringResource(R.string.measurement_precision),modifier=Modifier.padding(top=12.dp),style=MaterialTheme.typography.bodyLarge)
                 Text(stringResource(R.string.decimal_places,appSettings.measurementDecimalPlaces),color=MaterialTheme.colorScheme.onSurfaceVariant,style=MaterialTheme.typography.bodySmall)
