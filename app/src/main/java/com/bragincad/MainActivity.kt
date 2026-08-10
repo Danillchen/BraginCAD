@@ -153,6 +153,7 @@ class MainActivity : ComponentActivity() {
                     view.onRenderModelReady = { ms -> DwgOpenDiagnostics.stage("08_RENDER_MODEL_END","buildMs=$ms") }
                     view.onFirstRender = { ms -> DwgOpenDiagnostics.stage("10_FIRST_RENDER_END","renderMs=$ms");if(intent.getBooleanExtra("regression_stress",false)&&!regressionStressStarted){regressionStressStarted=true;view.startPerformanceStress()} }
                     if (view.model !== drawing) view.model = drawing
+                    view.setMeasurementDecimalPlaces(measurementDecimalPlaces)
                     val bg = if (dark) AndroidColor.rgb(11, 17, 22) else AndroidColor.rgb(247, 249, 250)
                     val fg = if (dark) AndroidColor.rgb(224, 231, 235) else AndroidColor.rgb(20, 25, 31)
                     view.setPalette(bg, fg, AndroidColor.rgb(0, 150, 199))
