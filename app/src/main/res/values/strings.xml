@@ -25,6 +25,10 @@
     <string name="about">О приложении</string>
     <string name="cancel">Отмена</string>
     <string name="clear">Очистить</string>
+    <string name="clear_measurements">Очистить измерения</string>
+    <string name="clear_measurements_confirmation">Удалить все измерения с чертежа?</string>
+    <string name="delete_measurement">Удалить измерение</string>
+    <string name="delete_all">Удалить все</string>
     <string name="done">Готово</string>
     <string name="close">Закрыть</string>
     <string name="back">Назад</string>
