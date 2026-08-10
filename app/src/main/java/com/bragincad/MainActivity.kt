@@ -67,15 +67,16 @@ class MainActivity : ComponentActivity() {
         super.onCreate(state)
         enableEdgeToEdge()
         setContent { BraginCadApp() }
+        val regressionFile = regressionFile(intent)
         val debuggable = applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0
-        val regressionName = intent.getStringExtra("regression_file")?.takeIf { debuggable && it.endsWith(".dwg",true) && File(it).name==it }
-        val regressionFile = regressionName?.let { File(filesDir, "regression/$it") }
         Log.i("BraginCAD", "RegressionInput extra=${intent.getStringExtra("regression_file")} debuggable=$debuggable path=${regressionFile?.absolutePath} exists=${regressionFile?.isFile}")
-        if (regressionFile?.isFile == true) loadPath(regressionFile, regressionName)
+        if (regressionFile?.isFile == true) loadPath(regressionFile, regressionFile.name)
         else handleViewIntent(intent)
     }
 
-    override fun onNewIntent(intent: Intent) { super.onNewIntent(intent);setIntent(intent);val viewport=intent.getStringExtra("regression_viewport");val area=intent.getStringExtra("regression_area");val hasFlags=intent.hasExtra("regression_lod")||intent.hasExtra("regression_culling")||intent.hasExtra("regression_hatch");when{viewport!=null->drawingView?.setRegressionViewport(viewport);area!=null->drawingView?.setRegressionArea(area=="on");hasFlags->drawingView?.setRegressionRenderFlags(intent.stringFlag("regression_lod"),intent.stringFlag("regression_culling"),intent.stringFlag("regression_hatch"));else->handleViewIntent(intent)} }
+    override fun onNewIntent(intent: Intent) { super.onNewIntent(intent);setIntent(intent);val regression=regressionFile(intent);val viewport=intent.getStringExtra("regression_viewport");val area=intent.getStringExtra("regression_area");val hasFlags=intent.hasExtra("regression_lod")||intent.hasExtra("regression_culling")||intent.hasExtra("regression_hatch");when{regression!=null->loadPath(regression,regression.name);viewport!=null->drawingView?.setRegressionViewport(viewport);area!=null->drawingView?.setRegressionArea(area=="on");hasFlags->drawingView?.setRegressionRenderFlags(intent.stringFlag("regression_lod"),intent.stringFlag("regression_culling"),intent.stringFlag("regression_hatch"));else->handleViewIntent(intent)} }
+
+    private fun regressionFile(source:Intent):File?{val debuggable=applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE!=0;if(!debuggable)return null;val name=source.getStringExtra("regression_file")?.takeIf{it.endsWith(".dwg",true)&&File(it).name==it}?:return null;return File(filesDir,"regression/$name").takeIf{it.isFile}}
 
     private fun Intent.stringFlag(name:String):Boolean?=getStringExtra(name)?.let{it=="on"||it=="true"||it=="1"}
 

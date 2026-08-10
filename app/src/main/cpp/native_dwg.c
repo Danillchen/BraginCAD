@@ -15,6 +15,10 @@ typedef struct { char **v; size_t n, cap; } StringBuffer;
 typedef struct { double a,b,c,d,tx,ty; } Affine;
 typedef struct { Dwg_Data *dwg; Buffer *out; StringBuffer *texts; int *layers; char **layer_names; unsigned int layer_count; unsigned char *path; size_t primitives,cycles,depth_stops; int dimension_depth; FILE *diag; } RenderCtx;
 
+/* dwg_obj_table_get_name/dwg_ent_get_layer_name only allocate for TU-backed
+ * binary DWG data. header.version alone is insufficient for imported data. */
+static int owns_table_utf8_name(const Dwg_Data *dwg){return dwg&&dwg->header.from_version>=R_2007&&!(dwg->opts&DWG_OPTS_IN);}
+
 static void diag(FILE *f,const char *stage,long index,const char *type){if(!f)return;fprintf(f,"{\"stage\":\"%s\",\"entity\":%ld,\"type\":\"%s\"}\n",stage,index,type?type:"");fflush(f);}
 
 static int utf8_valid(const unsigned char *s){
@@ -99,7 +103,7 @@ static void emit_text(RenderCtx *ctx,Dwg_Object *o,Affine m,int layer,const char
   char *text=NULL;int isnew=0;if(!dwg_dynapi_entity_utf8text(o->tio.entity->tio.UNUSED,name,field,&text,&isnew,NULL)||!text)return;
   double px,py;affine_point(m,x,y,&px,&py);double xx=m.a*cos(rotation)+m.c*sin(rotation),xy=m.b*cos(rotation)+m.d*sin(rotation),yx=-m.a*sin(rotation)+m.c*cos(rotation),yy=-m.b*sin(rotation)+m.d*cos(rotation);double xs=hypot(xx,xy),ys=hypot(yx,yy);size_t id=add_string(ctx->texts,text);
   Dwg_Object_Ref *ref=NULL;if(o->fixedtype==DWG_TYPE_TEXT)ref=o->tio.entity->tio.TEXT->style;else if(o->fixedtype==DWG_TYPE_MTEXT)ref=o->tio.entity->tio.MTEXT->style;else if(o->fixedtype==DWG_TYPE_ATTRIB)ref=o->tio.entity->tio.ATTRIB->style;Dwg_Object *so=ref?dwg_ref_object_silent(ctx->dwg,ref):NULL;Dwg_Object_STYLE *style=so&&so->fixedtype==DWG_TYPE_STYLE&&so->tio.object?so->tio.object->tio.STYLE:NULL;char *style_name=NULL,*font=NULL;int style_err=0,font_new=0;if(so)style_name=dwg_obj_table_get_name(so,&style_err);if(style)dwg_dynapi_entity_utf8text(style,"STYLE","font_file",&font,&font_new,NULL);size_t style_id=add_string(ctx->texts,style_name?style_name:"Standard"),font_id=add_string(ctx->texts,font?font:"");
-  push(ctx->out,multiline?7:6);push(ctx->out,layer);push(ctx->out,px);push(ctx->out,py);push(ctx->out,height*ys);push(ctx->out,atan2(xy,xx));push(ctx->out,id);push(ctx->out,horiz);if(!multiline){push(ctx->out,vert);push(ctx->out,width*(ys>1e-12?xs/ys:1));}else{push(ctx->out,box*xs);push(ctx->out,spacing);}push(ctx->out,style_id);push(ctx->out,font_id);push(ctx->out,style?style->width_factor:1.0);push(ctx->out,style?style->oblique_angle:0.0);push(ctx->out,ctx->dimension_depth?0:1);ctx->primitives++;if(style_name&&ctx->dwg->header.version>=R_2007)free(style_name);if(font_new)free(font);if(isnew)free(text);
+  push(ctx->out,multiline?7:6);push(ctx->out,layer);push(ctx->out,px);push(ctx->out,py);push(ctx->out,height*ys);push(ctx->out,atan2(xy,xx));push(ctx->out,id);push(ctx->out,horiz);if(!multiline){push(ctx->out,vert);push(ctx->out,width*(ys>1e-12?xs/ys:1));}else{push(ctx->out,box*xs);push(ctx->out,spacing);}push(ctx->out,style_id);push(ctx->out,font_id);push(ctx->out,style?style->width_factor:1.0);push(ctx->out,style?style->oblique_angle:0.0);push(ctx->out,ctx->dimension_depth?0:1);ctx->primitives++;if(style_name&&owns_table_utf8_name(ctx->dwg))free(style_name);if(font_new)free(font);if(isnew)free(text);
 }
 static void emit_entity(RenderCtx *ctx,Dwg_Object *o,Affine m,int inherited,int depth){
   if(!o||o->supertype!=DWG_SUPERTYPE_ENTITY||!o->tio.entity||o->tio.entity->invisible)return;int layer=effective_layer(ctx,o,inherited);double x1,y1,x2,y2;
@@ -149,10 +153,10 @@ JNIEXPORT jobjectArray JNICALL Java_com_bragincad_dwg_LibreDwgAdapter_nativeRead
   size_t *point_layers = calloc(layer_count ? layer_count : 1, sizeof(size_t));
   double point_min_x=INFINITY,point_min_y=INFINITY,point_max_x=-INFINITY,point_max_y=-INFINITY;
   for (unsigned int i=0; i<layer_count; i++) {
-    int err=0; char *name = layers && layers[i] ? dwg_obj_layer_get_name(layers[i], &err) : NULL;
+    int err=0;Dwg_Object *layer_object=layers&&layers[i]?dwg_obj_generic_to_object(layers[i],&err):NULL;char *name=layer_object&&!err?dwg_obj_table_get_name(layer_object,&err):NULL;
     layer_names[i] = strdup(name ? name : "0");
     layer_visible[i] = (!layers[i] || (!layers[i]->off && !layers[i]->frozen)) ? JNI_TRUE : JNI_FALSE;
-    if (name && dwg.header.version >= R_2007) free(name);
+    if(name&&owns_table_utf8_name(&dwg))free(name);
   }
 
   BlockStats block_stats={0};unsigned char *block_path=calloc(dwg.num_objects?dwg.num_objects:1,1);
@@ -192,7 +196,7 @@ JNIEXPORT jobjectArray JNICALL Java_com_bragincad_dwg_LibreDwgAdapter_nativeRead
       case DWG_TYPE_DIMENSION_LINEAR:case DWG_TYPE_DIMENSION_ALIGNED:rendered=dwg_ref_object_silent(&dwg,o->tio.entity->tio.DIMENSION_common->block)!=NULL;break;
       default:break;
     }
-    if (entity_layer && dwg.header.version >= R_2007 && strcmp(entity_layer,"0")) free(entity_layer);
+    if(entity_layer&&owns_table_utf8_name(&dwg)&&strcmp(entity_layer,"0"))free(entity_layer);
     if(rendered)supported++;else{unsupported_graphics++;count_type(&unsupported_types,&unsupported_n,&unsupported_cap,type_name);}
   }
   int defpoints=layer_index("Defpoints",layer_names,layer_count);if(dwg.header_vars.PDMODE==0&&defpoints>=0)invisible_graphical=point_layers[defpoints];
@@ -217,7 +221,7 @@ JNIEXPORT jobjectArray JNICALL Java_com_bragincad_dwg_LibreDwgAdapter_nativeRead
   LOGI("point_usage pdmode=%d pdsize=%.6g bounds=[%.6g,%.6g]-[%.6g,%.6g]",dwg.header_vars.PDMODE,dwg.header_vars.PDSIZE,point_min_x,point_min_y,point_max_x,point_max_y);
   LOGI("remaining_profile hatch_solid=%zu hatch_pattern=%zu hatch_paths=%zu spline_ctrl=%zu spline_fit=%zu spline_max_degree=%d wipeout_clip_vertices=%zu viewport_model=%zu viewport_paper=%zu viewport_block=%zu",hatch_solid,hatch_pattern,hatch_paths,spline_ctrl,spline_fit,spline_max_degree,wipeout_clips,viewport_model,viewport_paper,viewport_block);
   LOGI("hatch_profile associative=%zu polyline_paths=%zu line_edges=%zu arc_edges=%zu ellipse_edges=%zu spline_edges=%zu",hatch_associative,hatch_poly_paths,hatch_line_edges,hatch_arc_edges,hatch_ellipse_edges,hatch_spline_edges);for(size_t i=0;i<hatch_pattern_n;i++)LOGI("hatch_pattern name=%s count=%zu",hatch_patterns[i].name,hatch_patterns[i].count);
-  for(BITCODE_BL i=0;i<dwg.num_objects;i++)if(dwg.object[i].fixedtype==DWG_TYPE_STYLE&&dwg.object[i].tio.object&&dwg.object[i].tio.object->tio.STYLE){Dwg_Object_STYLE *s=dwg.object[i].tio.object->tio.STYLE;int name_err=0;char *style_name=dwg_obj_table_get_name(&dwg.object[i],&name_err),*font=NULL,*bigfont=NULL;int font_new=0,bigfont_new=0;dwg_dynapi_entity_utf8text(s,"STYLE","font_file",&font,&font_new,NULL);dwg_dynapi_entity_utf8text(s,"STYLE","bigfont_file",&bigfont,&bigfont_new,NULL);const char *kind=(font&&strstr(font,".shx"))?"SHX":((font&&strstr(font,".ttf"))?"TTF":"unknown");LOGI("text_style name=%s font=%s bigfont=%s kind=%s fixed_height=%.6g width_factor=%.6g oblique=%.6g generation=%u text=%zu mtext=%zu attrib=%zu",style_name?style_name:"",font?font:"",bigfont?bigfont:"",kind,s->text_size,s->width_factor,s->oblique_angle,s->generation,style_text[i],style_mtext[i],style_attrib[i]);if(style_name&&dwg.header.version>=R_2007)free(style_name);if(font_new)free(font);if(bigfont_new)free(bigfont);}
+  for(BITCODE_BL i=0;i<dwg.num_objects;i++)if(dwg.object[i].fixedtype==DWG_TYPE_STYLE&&dwg.object[i].tio.object&&dwg.object[i].tio.object->tio.STYLE){Dwg_Object_STYLE *s=dwg.object[i].tio.object->tio.STYLE;int name_err=0;char *style_name=dwg_obj_table_get_name(&dwg.object[i],&name_err),*font=NULL,*bigfont=NULL;int font_new=0,bigfont_new=0;dwg_dynapi_entity_utf8text(s,"STYLE","font_file",&font,&font_new,NULL);dwg_dynapi_entity_utf8text(s,"STYLE","bigfont_file",&bigfont,&bigfont_new,NULL);const char *kind=(font&&strstr(font,".shx"))?"SHX":((font&&strstr(font,".ttf"))?"TTF":"unknown");LOGI("text_style name=%s font=%s bigfont=%s kind=%s fixed_height=%.6g width_factor=%.6g oblique=%.6g generation=%u text=%zu mtext=%zu attrib=%zu",style_name?style_name:"",font?font:"",bigfont?bigfont:"",kind,s->text_size,s->width_factor,s->oblique_angle,s->generation,style_text[i],style_mtext[i],style_attrib[i]);if(style_name&&owns_table_utf8_name(&dwg))free(style_name);if(font_new)free(font);if(bigfont_new)free(bigfont);}
   for(unsigned int i=0;i<layer_count;i++)if(point_layers[i])LOGI("point_layer name=%s count=%zu visible=%d",layer_names[i],point_layers[i],layer_visible[i]);
   diag(report,"06_JNI_TRANSFER_END",-1,"");if(report)fclose(report);for(unsigned int i=0;i<layer_count;i++)free(layer_names[i]);for(size_t i=0;i<texts.n;i++)free(texts.v[i]);free(texts.v);free(style_text);free(style_mtext);free(style_attrib);free(object_layers);free(point_layers);free(layer_names);free(layer_visible);free(layers);free(types);free(unsupported_types);free(hatch_patterns);free(b.v);dwg_free(&dwg);return result;
 }
