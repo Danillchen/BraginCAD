@@ -17,6 +17,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.*
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -29,19 +30,20 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.bragincad.dwg.LibreDwgAdapter
 import com.bragincad.model.*
 import com.bragincad.settings.SettingsRepository
+import com.bragincad.ui.BraginCadTheme
+import com.bragincad.ui.BraginRadii
+import com.bragincad.ui.BraginSpacing
 import com.bragincad.view.DrawingView
 import java.io.File
 import java.io.IOException
@@ -83,8 +85,7 @@ class MainActivity : ComponentActivity() {
         val systemDark = androidx.compose.foundation.isSystemInDarkTheme()
         val dark = when (appSettings.theme) { 1 -> false; 2 -> true; else -> systemDark }
         SideEffect { enableEdgeToEdge(statusBarStyle = SystemBarStyle.auto(AndroidColor.TRANSPARENT, AndroidColor.TRANSPARENT) { dark }, navigationBarStyle = SystemBarStyle.auto(AndroidColor.TRANSPARENT, AndroidColor.TRANSPARENT) { dark }) }
-        val colors = if (dark) darkColorScheme(primary = Color(0xFF7DD3FC), secondary = Color(0xFF67E8F9), background = Color(0xFF0B1116), surface = Color(0xFF121A21), surfaceContainer = Color(0xFF172129)) else lightColorScheme(primary = Color(0xFF00658A), secondary = Color(0xFF006878), background = Color(0xFFF6F8FA), surface = Color(0xFFFDFDFE), surfaceContainer = Color(0xFFEAF0F3))
-        MaterialTheme(colorScheme = colors, typography = Typography()) {
+        BraginCadTheme(dark = dark) {
             Surface(Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
                 when {
                     model != null -> ViewerScreen(dark, appSettings.measurementDecimalPlaces)
@@ -95,23 +96,24 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    @OptIn(ExperimentalMaterial3Api::class)
     @Composable
     private fun StartScreen() {
         val recentItems = remember(model, loading) { recent() }
-        Scaffold(contentWindowInsets = WindowInsets.safeDrawing) { padding ->
-            Column(Modifier.fillMaxSize().padding(padding).padding(horizontal = 24.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-                Spacer(Modifier.weight(0.7f))
-                Surface(shape = CircleShape, color = MaterialTheme.colorScheme.primaryContainer, modifier = Modifier.size(84.dp)) { Icon(UxIcons.Brand, null, Modifier.padding(20.dp), tint = MaterialTheme.colorScheme.onPrimaryContainer) }
-                Spacer(Modifier.height(20.dp)); Text(stringResource(R.string.app_name), style = MaterialTheme.typography.headlineLarge, fontWeight = FontWeight.SemiBold)
-                Spacer(Modifier.height(32.dp))
-                Button(onClick = ::openDocument, enabled = !loading, modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) { Icon(UxIcons.Folder, null); Spacer(Modifier.width(10.dp)); Text(if (loading) stringResource(R.string.loading_drawing) else stringResource(R.string.open_drawing)) }
-                Spacer(Modifier.height(36.dp)); Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) { Text(stringResource(R.string.recent), style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Medium) }
-                Spacer(Modifier.height(8.dp))
-                if (recentItems.isEmpty()) Box(Modifier.fillMaxWidth().height(80.dp), contentAlignment = Alignment.CenterStart) { Text(stringResource(R.string.no_recent_files), color = MaterialTheme.colorScheme.onSurfaceVariant) }
-                else LazyColumn(Modifier.fillMaxWidth().weight(1f)) { items(recentItems, key = { it.uri }) { item -> ListItem(headlineContent = { Text(item.label, maxLines = 1, overflow = TextOverflow.Ellipsis) }, leadingContent = { Icon(UxIcons.Document, null) }, modifier = Modifier.clickable { openDrawing(Uri.parse(item.uri), item.label, false) }); HorizontalDivider() } }
-                if (recentItems.isEmpty()) Spacer(Modifier.weight(1f))
+        var settingsOpen by remember { mutableStateOf(false) }
+        Scaffold(contentWindowInsets=WindowInsets.safeDrawing,topBar={TopAppBar(title={Text(stringResource(R.string.app_name),style=MaterialTheme.typography.titleLarge)},actions={IconButton(onClick={settingsOpen=true}){Icon(Icons.Default.Settings,stringResource(R.string.settings))}},colors=TopAppBarDefaults.topAppBarColors(containerColor=MaterialTheme.colorScheme.background))}) { padding ->
+            Column(Modifier.fillMaxSize().padding(padding).padding(horizontal=BraginSpacing.XLarge)) {
+                Spacer(Modifier.height(BraginSpacing.XLarge))
+                Row(verticalAlignment=Alignment.CenterVertically){Surface(shape=RoundedCornerShape(BraginRadii.Large),color=MaterialTheme.colorScheme.primaryContainer,modifier=Modifier.size(56.dp)){Icon(UxIcons.Brand,null,Modifier.padding(14.dp),tint=MaterialTheme.colorScheme.onPrimaryContainer)};Spacer(Modifier.width(BraginSpacing.Large));Column{Text(stringResource(R.string.app_name),style=MaterialTheme.typography.headlineSmall);Text(stringResource(R.string.about_text),style=MaterialTheme.typography.bodySmall,color=MaterialTheme.colorScheme.onSurfaceVariant,maxLines=1,overflow=TextOverflow.Ellipsis)}}
+                Spacer(Modifier.height(BraginSpacing.XLarge))
+                Button(onClick=::openDocument,enabled=!loading,modifier=Modifier.fillMaxWidth().heightIn(min=52.dp),shape=RoundedCornerShape(BraginRadii.Medium)){if(loading)CircularProgressIndicator(Modifier.size(20.dp),strokeWidth=2.dp)else Icon(UxIcons.Folder,null);Spacer(Modifier.width(BraginSpacing.Medium));Text(if(loading)stringResource(R.string.loading_drawing) else stringResource(R.string.open_drawing))}
+                Spacer(Modifier.height(32.dp));Text(stringResource(R.string.recent),style=MaterialTheme.typography.titleMedium)
+                Spacer(Modifier.height(BraginSpacing.Small));HorizontalDivider(color=MaterialTheme.colorScheme.outlineVariant)
+                if(recentItems.isEmpty())Box(Modifier.fillMaxWidth().height(72.dp),contentAlignment=Alignment.CenterStart){Text(stringResource(R.string.no_recent_files),color=MaterialTheme.colorScheme.onSurfaceVariant)}
+                else LazyColumn(Modifier.fillMaxWidth().weight(1f)){items(recentItems,key={it.uri}){item->ListItem(headlineContent={Text(item.label,maxLines=1,overflow=TextOverflow.Ellipsis)},leadingContent={Icon(UxIcons.Document,null,tint=MaterialTheme.colorScheme.primary)},colors=ListItemDefaults.colors(containerColor=MaterialTheme.colorScheme.background),modifier=Modifier.clickable{openDrawing(Uri.parse(item.uri),item.label,false)});HorizontalDivider(color=MaterialTheme.colorScheme.outlineVariant)}}
             }
         }
+        if(settingsOpen)SettingsDialog{settingsOpen=false}
     }
 
     @OptIn(ExperimentalMaterial3Api::class)
@@ -136,6 +138,7 @@ class MainActivity : ComponentActivity() {
         var dialog by remember { mutableStateOf<String?>(null) }
         var settingsOpen by remember { mutableStateOf(false) }
         val drawing = model ?: return
+        var renderReady by remember(drawing) { mutableStateOf(false) }
         val measurement = when {
             measuredDistance != null -> formatDistance(measuredDistance!!, measuredUnit, measurementSnapped, measurementDecimalPlaces)
             measuredArea != null && areaPoints >= 3 -> formatArea(measuredArea!!, measuredUnit, measurementDecimalPlaces)
@@ -150,11 +153,11 @@ class MainActivity : ComponentActivity() {
         ) { padding ->
             Box(Modifier.fillMaxSize().padding(padding)) {
                 AndroidView(factory = { context -> DrawingView(context).also { drawingView = it } }, update = { view ->
-                    view.onRenderModelReady = { ms -> DwgOpenDiagnostics.stage("08_RENDER_MODEL_END","buildMs=$ms") }
+                    view.onRenderModelReady = { ms -> runOnUiThread { renderReady=true;DwgOpenDiagnostics.stage("08_RENDER_MODEL_END","buildMs=$ms") } }
                     view.onFirstRender = { ms -> DwgOpenDiagnostics.stage("10_FIRST_RENDER_END","renderMs=$ms");if(intent.getBooleanExtra("regression_stress",false)&&!regressionStressStarted){regressionStressStarted=true;view.startPerformanceStress()} }
                     if (view.model !== drawing) view.model = drawing
                     view.setMeasurementDecimalPlaces(measurementDecimalPlaces)
-                    val bg = if (dark) AndroidColor.rgb(11, 17, 22) else AndroidColor.rgb(247, 249, 250)
+                    val bg = if (dark) AndroidColor.rgb(8,13,17) else AndroidColor.rgb(244,247,249)
                     val fg = if (dark) AndroidColor.rgb(224, 231, 235) else AndroidColor.rgb(20, 25, 31)
                     view.setPalette(bg, fg, AndroidColor.rgb(0, 150, 199))
                     view.onCanvasTap = { if (menuOpen) menuOpen = false }
@@ -164,7 +167,7 @@ class MainActivity : ComponentActivity() {
                     view.onAreaChanged = { area, unit, points -> runOnUiThread { measuredArea=area;measuredUnit=unit;areaPoints=points;measurementPrompt=getString(R.string.area_points_needed,points) } }
                 }, modifier = Modifier.fillMaxSize().semantics { contentDescription = getString(R.string.drawing_ready) })
 
-                Column(Modifier.align(Alignment.BottomEnd).navigationBarsPadding().padding(16.dp), horizontalAlignment = Alignment.End) {
+                if(renderReady)Column(Modifier.align(Alignment.BottomEnd).navigationBarsPadding().padding(16.dp), horizontalAlignment = Alignment.End) {
                     AnimatedVisibility(visible = menuOpen && !measuring, enter = fadeIn(tween(180)) + slideInVertically(tween(180)) { it / 3 }, exit = fadeOut(tween(150)) + slideOutVertically(tween(150)) { it / 3 }) {
                         Column(verticalArrangement = Arrangement.spacedBy(10.dp), horizontalAlignment = Alignment.End) {
                             MenuFab(UxIcons.Fit, stringResource(R.string.fit_drawing)) { drawingView?.fitToDrawing(); menuOpen = false }
@@ -180,6 +183,8 @@ class MainActivity : ComponentActivity() {
                     if (!measuring) FloatingActionButton(onClick = { menuOpen = !menuOpen }, shape = CircleShape, modifier = Modifier.size(56.dp).semantics { contentDescription = getString(R.string.main_menu) }) { Icon(if (menuOpen) Icons.Default.Close else UxIcons.Brand, null) }
                 }
 
+                if(!renderReady)Surface(Modifier.align(Alignment.Center),shape=RoundedCornerShape(BraginRadii.Large),color=MaterialTheme.colorScheme.surfaceContainerHigh,border=BorderStroke(1.dp,MaterialTheme.colorScheme.outlineVariant),tonalElevation=3.dp){Row(Modifier.padding(horizontal=BraginSpacing.Large,vertical=BraginSpacing.Medium),verticalAlignment=Alignment.CenterVertically){CircularProgressIndicator(Modifier.size(22.dp),strokeWidth=2.dp);Spacer(Modifier.width(BraginSpacing.Medium));Text(stringResource(R.string.loading_drawing))}}
+
                 if(measuring&&coordinateMode)CoordinatePanel(Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(12.dp),coordinatePoint,coordinateZ,coordinateSnapped,drawing.units,measurementDecimalPlaces,onCopy={point->val text="X=${formatNumber(point.x,measurementDecimalPlaces,true)}; Y=${formatNumber(point.y,measurementDecimalPlaces,true)}"+(coordinateZ?.let{"; Z=${formatNumber(it,measurementDecimalPlaces,true)}"}?:"");(getSystemService(CLIPBOARD_SERVICE) as android.content.ClipboardManager).setPrimaryClip(ClipData.newPlainText(getString(R.string.coordinates),text))},onClose={drawingView?.cancelMeasurement();measuring=false;coordinateMode=false})
                 else if (measuring) MeasurementPanel(Modifier.align(Alignment.BottomCenter).navigationBarsPadding().padding(12.dp), measurement, areaMode, onCancel = { drawingView?.cancelMeasurement();measuring=false;areaMode=false }, onUndo={drawingView?.undoAreaPoint()}, onClear = { if(areaMode){drawingView?.clearArea();measuredArea=null;areaPoints=0;measurementPrompt=getString(R.string.area_points_needed,0)}else{drawingView?.startMeasurement();measuredDistance=null;measurementPrompt=getString(R.string.measurement_first)} }, onDone = { if(areaMode)drawingView?.finishArea() else drawingView?.cancelMeasurement();measuring=false;areaMode=false })
             }
@@ -190,11 +195,11 @@ class MainActivity : ComponentActivity() {
     }
 
     @OptIn(ExperimentalMaterial3Api::class)
-    @Composable private fun MenuFab(icon: ImageVector, label: String, action: () -> Unit) { val state = rememberTooltipState(); TooltipBox(positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(), tooltip = { PlainTooltip { Text(label) } }, state = state) { SmallFloatingActionButton(onClick = action, modifier = Modifier.size(50.dp).semantics { contentDescription = label }, containerColor = MaterialTheme.colorScheme.surfaceContainerHigh) { Icon(icon, null) } } }
+    @Composable private fun MenuFab(icon: ImageVector,label:String,action:()->Unit){val state=rememberTooltipState();TooltipBox(positionProvider=TooltipDefaults.rememberPlainTooltipPositionProvider(),tooltip={PlainTooltip{Text(label)}},state=state){Surface(shape=RoundedCornerShape(BraginRadii.Large),color=MaterialTheme.colorScheme.surfaceContainerHigh,tonalElevation=3.dp,shadowElevation=3.dp,border=BorderStroke(1.dp,MaterialTheme.colorScheme.outlineVariant),modifier=Modifier.size(50.dp).semantics{contentDescription=label}.clickable(onClick=action)){Box(Modifier.fillMaxSize(),contentAlignment=Alignment.Center){Icon(icon,null,Modifier.size(22.dp))}}}}
 
-    @Composable private fun MeasurementPanel(modifier: Modifier, value: String, area:Boolean,onCancel: () -> Unit,onUndo:()->Unit, onClear: () -> Unit, onDone: () -> Unit) { Surface(modifier, shape = RoundedCornerShape(22.dp), tonalElevation = 5.dp, color = MaterialTheme.colorScheme.surfaceContainerHigh) { Row(Modifier.padding(8.dp), verticalAlignment = Alignment.CenterVertically) { Icon(if(area)UxIcons.Area else UxIcons.Ruler, stringResource(if(area)R.string.area_mode else R.string.measurement_mode), tint = MaterialTheme.colorScheme.primary); Text(value, Modifier.padding(horizontal = 10.dp).weight(1f, fill = false), maxLines = 2);if(area)IconButton(onClick=onUndo){Icon(Icons.Default.ArrowBack,stringResource(R.string.undo_point))}; IconButton(onClick = onCancel) { Icon(Icons.Default.Close, stringResource(R.string.cancel)) }; IconButton(onClick = onClear) { Icon(Icons.Default.Delete, stringResource(R.string.clear)) }; FilledIconButton(onClick = onDone) { Icon(Icons.Default.Check, stringResource(R.string.done)) } } } }
+    @Composable private fun MeasurementPanel(modifier:Modifier,value:String,area:Boolean,onCancel:()->Unit,onUndo:()->Unit,onClear:()->Unit,onDone:()->Unit){Surface(modifier,shape=RoundedCornerShape(BraginRadii.Floating),tonalElevation=4.dp,shadowElevation=4.dp,border=BorderStroke(1.dp,MaterialTheme.colorScheme.outlineVariant),color=MaterialTheme.colorScheme.surfaceContainerHigh){Row(Modifier.padding(BraginSpacing.Small),verticalAlignment=Alignment.CenterVertically){Icon(if(area)UxIcons.Area else UxIcons.Ruler,stringResource(if(area)R.string.area_mode else R.string.measurement_mode),tint=MaterialTheme.colorScheme.primary);Text(value,Modifier.padding(horizontal=BraginSpacing.Medium).weight(1f,fill=false),maxLines=2);if(area)IconButton(onClick=onUndo){Icon(Icons.Default.ArrowBack,stringResource(R.string.undo_point))};IconButton(onClick=onCancel){Icon(Icons.Default.Close,stringResource(R.string.cancel))};IconButton(onClick=onClear){Icon(Icons.Default.Delete,stringResource(R.string.clear))};FilledIconButton(onClick=onDone){Icon(Icons.Default.Check,stringResource(R.string.done))}}}}
 
-    @Composable private fun CoordinatePanel(modifier:Modifier,point:Point2?,z:Double?,snapped:Boolean,unit:DrawingUnit,decimalPlaces:Int,onCopy:(Point2)->Unit,onClose:()->Unit){Surface(modifier,shape=RoundedCornerShape(22.dp),tonalElevation=5.dp,color=MaterialTheme.colorScheme.surfaceContainerHigh){Row(Modifier.padding(10.dp),verticalAlignment=Alignment.CenterVertically){Icon(UxIcons.Coordinates,stringResource(R.string.coordinates),tint=MaterialTheme.colorScheme.primary);Column(Modifier.padding(horizontal=10.dp).weight(1f,false)){Text(if(point==null)stringResource(R.string.coordinate_tap) else "X: ${formatNumber(point.x,decimalPlaces,true)}\nY: ${formatNumber(point.y,decimalPlaces,true)}"+(z?.let{"\nZ: ${formatNumber(it,decimalPlaces,true)}"}?:""),maxLines=3);if(point!=null)Text((if(snapped)stringResource(R.string.endpoint_snapped)+" · " else "")+stringResource(R.string.coordinate_units,localizedUnitName(unit)),style=MaterialTheme.typography.labelSmall)};if(point!=null)TextButton(onClick={onCopy(point)}){Text(stringResource(R.string.copy))};IconButton(onClick=onClose){Icon(Icons.Default.Close,stringResource(R.string.close))}}}}
+    @Composable private fun CoordinatePanel(modifier:Modifier,point:Point2?,z:Double?,snapped:Boolean,unit:DrawingUnit,decimalPlaces:Int,onCopy:(Point2)->Unit,onClose:()->Unit){Surface(modifier,shape=RoundedCornerShape(BraginRadii.Floating),tonalElevation=4.dp,shadowElevation=4.dp,border=BorderStroke(1.dp,MaterialTheme.colorScheme.outlineVariant),color=MaterialTheme.colorScheme.surfaceContainerHigh){Row(Modifier.padding(BraginSpacing.Medium),verticalAlignment=Alignment.CenterVertically){Icon(UxIcons.Coordinates,stringResource(R.string.coordinates),tint=MaterialTheme.colorScheme.primary);Column(Modifier.padding(horizontal=BraginSpacing.Medium).weight(1f,false)){Text(if(point==null)stringResource(R.string.coordinate_tap) else "X: ${formatNumber(point.x,decimalPlaces,true)}\nY: ${formatNumber(point.y,decimalPlaces,true)}"+(z?.let{"\nZ: ${formatNumber(it,decimalPlaces,true)}"}?:""),maxLines=3);if(point!=null)Text((if(snapped)stringResource(R.string.endpoint_snapped)+" · " else "")+stringResource(R.string.coordinate_units,localizedUnitName(unit)),style=MaterialTheme.typography.labelSmall)};if(point!=null)TextButton(onClick={onCopy(point)}){Text(stringResource(R.string.copy))};IconButton(onClick=onClose){Icon(Icons.Default.Close,stringResource(R.string.close))}}}}
 
     @Composable private fun InfoDialog(kind: String, drawing: DrawingModel, dismiss: () -> Unit) { val title: String; val body: String; when (kind) { "stats" -> { title = stringResource(R.string.statistics); val s = drawing.stats; body = stringResource(R.string.stats_body, drawing.version, s.totalObjects, s.graphicalEntities, s.supportedEntities, formatNumber(100.0 * (s.visibleGraphicalEntities - s.unsupportedVisibleGraphicalEntities) / s.visibleGraphicalEntities, 2), s.renderPrimitiveCount) }; "about" -> { title = stringResource(R.string.about); body = stringResource(R.string.about_text) }; else -> { title = stringResource(R.string.drawing_information); body = stringResource(R.string.info_body, fileLabel, drawing.version, localizedUnitName(drawing.units), drawing.layers.size, drawing.stats.totalObjects) } }; AlertDialog(onDismissRequest = dismiss, title = { Text(title) }, text = { Text(body) }, confirmButton = { TextButton(onClick = dismiss) { Text(stringResource(R.string.close)) } }) }
 
