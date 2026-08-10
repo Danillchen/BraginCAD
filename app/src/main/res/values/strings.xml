@@ -46,6 +46,9 @@
     <string name="theme_system">Как в системе</string>
     <string name="theme_light">Светлая</string>
     <string name="theme_dark">Тёмная</string>
+    <string name="measurements_settings">Измерения</string>
+    <string name="measurement_precision">Точность измерений</string>
+    <string name="decimal_places">Знаков после запятой: %1$d</string>
     <string name="about_text">BraginCAD — автономный мобильный просмотрщик строительных DWG.</string>
     <string name="layer_visible">Слой %1$s включён</string>
     <string name="layer_hidden">Слой %1$s выключен</string>
