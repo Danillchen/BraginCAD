@@ -8,7 +8,7 @@
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
         <item name="android:windowSplashScreenBackground">#08131D</item>
-        <item name="android:windowSplashScreenAnimatedIcon">@drawable/ic_bragincad_mark</item>
-        <item name="android:windowSplashScreenIconBackgroundColor">#102636</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/ic_bragincad_brand</item>
+        <item name="android:windowSplashScreenIconBackgroundColor">#080D13</item>
     </style>
 </resources>
