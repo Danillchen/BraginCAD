@@ -4,15 +4,16 @@ internal data class DecodedMText(val plainText: String, val unsupportedCommands:
 
 internal object MTextDecoder {
     fun decode(raw: String): DecodedMText {
-        val out = StringBuilder(raw.length)
+        val safeRaw=raw.take(MAX_INPUT_CHARS)
+        val out = StringBuilder(safeRaw.length)
         val unsupported = linkedSetOf<Char>()
         var i = 0
-        while (i < raw.length) {
-            val ch = raw[i]
+        while (i < safeRaw.length) {
+            val ch = safeRaw[i]
             if (ch == '{' || ch == '}') { i++; continue }
             if (ch != '\\') { out.append(ch); i++; continue }
-            if (++i >= raw.length) { out.append('\\'); break }
-            val command = raw[i++]
+            if (++i >= safeRaw.length) { out.append('\\'); break }
+            val command = safeRaw[i++]
             when (command) {
                 '\\' -> out.append('\\')
                 '{' -> out.append('{')
@@ -21,17 +22,17 @@ internal object MTextDecoder {
                 'P' -> out.append('\n')
                 'L', 'l', 'O', 'o', 'K', 'k' -> Unit
                 'S' -> {
-                    val end = raw.indexOf(';', i).let { if (it < 0) raw.length else it }
-                    val value = raw.substring(i, end)
+                    val end = safeRaw.indexOf(';', i).let { if (it < 0) safeRaw.length else it }
+                    val value = safeRaw.substring(i, end)
                     out.append(value.replace('#', '/').replace('^', '/'))
-                    i = (end + 1).coerceAtMost(raw.length)
+                    i = (end + 1).coerceAtMost(safeRaw.length)
                 }
                 'A', 'C', 'c', 'F', 'f', 'H', 'Q', 'T', 'W', 'p' ->
-                    i = skipArgument(raw, i)
+                    i = skipArgument(safeRaw, i)
                 'U' -> {
                     // AutoCAD/LibreDWG commonly exposes \U+XXXX unicode escapes.
-                    if (i < raw.length && raw[i] == '+' && i + 4 < raw.length) {
-                        val value = raw.substring(i + 1, i + 5).toIntOrNull(16)
+                    if (i < safeRaw.length && safeRaw[i] == '+' && i + 4 < safeRaw.length) {
+                        val value = safeRaw.substring(i + 1, i + 5).toIntOrNull(16)
                         if (value != null) { out.append(value.toChar()); i += 5 } else unsupported += command
                     } else unsupported += command
                 }
@@ -39,7 +40,7 @@ internal object MTextDecoder {
                     // Formatting commands must never leak into the drawing. Preserve an
                     // unknown escape's payload only when it has no semicolon argument.
                     unsupported += command
-                    val end = raw.indexOf(';', i)
+                    val end = safeRaw.indexOf(';', i)
                     if (end >= i) i = end + 1
                 }
             }
@@ -56,4 +57,5 @@ internal object MTextDecoder {
         val end = raw.indexOf(';', start)
         return if (end < 0) raw.length else end + 1
     }
+    private const val MAX_INPUT_CHARS=1_000_000
 }

@@ -39,28 +39,31 @@ function Match-Value([string]$text, [string]$pattern) {
     return $match.Groups[1].Value
 }
 
+$caseIndex = 0
 $results = foreach ($file in $files) {
+    $caseIndex++
     Write-Host "Running $($file.Name)..."
-    $remoteFile = "/data/local/tmp/bragincad-$($file.Name)"
+    $caseName = "case-$caseIndex.dwg"
+    $remoteFile = "/data/local/tmp/bragincad-$caseName"
     & $adb -s $Device push $file.FullName $remoteFile | Out-Null
     if ($LASTEXITCODE) { throw "Cannot push $($file.Name)" }
     & $adb -s $Device shell run-as com.bragincad mkdir -p files/regression | Out-Null
-    & $adb -s $Device shell run-as com.bragincad cp $remoteFile "files/regression/$($file.Name)" | Out-Null
+    & $adb -s $Device shell run-as com.bragincad cp $remoteFile "files/regression/$caseName" | Out-Null
     if ($LASTEXITCODE) { throw "Cannot stage $($file.Name) in app storage" }
     & $adb -s $Device logcat -c
-    & $adb -s $Device shell am start -S -n com.bragincad/.MainActivity --es regression_file $file.Name | Out-Null
+    & $adb -s $Device shell am start -S -n com.bragincad/.MainActivity --es regression_file $caseName | Out-Null
 
     $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
     $log = ""
     do {
         Start-Sleep -Milliseconds 500
         $log = (& $adb -s $Device logcat -d -v brief 2>&1) -join "`n"
-        $selected = $log -match "RegressionInput .*extra=$([regex]::Escape($file.Name)).*exists=true"
-        $complete = $selected -and $log -match "file=$([regex]::Escape($file.Name)) .*modelBuildMs=" -and $log -match "firstRenderMs="
+        $selected = $log -match "RegressionInput .*extra=$([regex]::Escape($caseName)).*exists=true"
+        $complete = $selected -and $log -match "file=$([regex]::Escape($caseName)) .*modelBuildMs=" -and $log -match "firstRenderMs="
         $crashed = $log -match "FATAL EXCEPTION|Fatal signal|AndroidRuntime.*Process: com\.bragincad"
     } until ($complete -or $crashed -or [DateTime]::UtcNow -gt $deadline)
 
-    $appLine = ([regex]::Matches($log, "(?m)^.*BraginCAD\(.*file=$([regex]::Escape($file.Name)) .*$") | Select-Object -Last 1).Value
+    $appLine = ([regex]::Matches($log, "(?m)^.*BraginCAD\(.*file=$([regex]::Escape($caseName)) .*$") | Select-Object -Last 1).Value
     $nativeLine = ([regex]::Matches($log, "(?m)^.*BraginCADNative\(.*decoded objects=.*$") | Select-Object -Last 1).Value
     $timingLine = ([regex]::Matches($log, "(?m)^.*BraginCADNative\(.*timing decode_ms=.*$") | Select-Object -Last 1).Value
     $renderLine = ([regex]::Matches($log, "(?m)^.*BraginCAD\(.*firstRenderMs=.*$") | Select-Object -Last 1).Value
@@ -89,6 +92,8 @@ $results = foreach ($file in $files) {
         crashed = [bool]$hasCrash
     }
     $log | Set-Content -LiteralPath (Join-Path $outputPath "$($file.BaseName).log") -Encoding utf8
+    (& $adb -s $Device exec-out run-as com.bragincad cat cache/dwg-open-debug.json 2>&1) -join "`n" | Set-Content -LiteralPath (Join-Path $outputPath "$($file.BaseName)-open-debug.json") -Encoding utf8
+    (& $adb -s $Device exec-out run-as com.bragincad cat cache/dwg-open-native.log 2>&1) -join "`n" | Set-Content -LiteralPath (Join-Path $outputPath "$($file.BaseName)-native.log") -Encoding utf8
 }
 
 $timestamp = Get-Date -Format "yyyyMMdd-HHmmss"

@@ -3,9 +3,9 @@ package com.bragincad.dwg
 import com.bragincad.model.*
 
 class LibreDwgAdapter : DwgReader {
-    external fun nativeRead(path:String):Array<Any>
+    external fun nativeRead(path:String,reportPath:String):Array<Any>
     override fun read(path:String):DrawingModel {
-        val started=System.nanoTime();val payload=nativeRead(path)
+        val started=System.nanoTime();val payload=nativeRead(path,"$path.open-debug.log")
         val raw=payload[0] as DoubleArray;require(raw.size>=10){"LibreDWG returned no metadata"}
         @Suppress("UNCHECKED_CAST") val names=payload[1] as Array<String>
         val visible=payload[2] as BooleanArray
