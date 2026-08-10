@@ -89,11 +89,15 @@ $results = foreach ($file in $files) {
     $nativeLine = ([regex]::Matches($log, "(?m)^.*BraginCADNative\(.*decoded objects=.*$") | Select-Object -Last 1).Value
     $timingLine = ([regex]::Matches($log, "(?m)^.*BraginCADNative\(.*timing decode_ms=.*$") | Select-Object -Last 1).Value
     $renderLine = ([regex]::Matches($log, "(?m)^.*BraginCADRender\(.*firstRenderMs=.*$") | Select-Object -Last 1).Value
+    $renderModelLine = ([regex]::Matches($log, "(?m)^.*BraginCADRender\(.*renderModelMs=.*$") | Select-Object -First 1).Value
     $meminfo = (& $adb -s $Device shell dumpsys meminfo com.bragincad 2>&1) -join "`n"
     $pss = Match-Value $meminfo "TOTAL PSS:\s+(\d+)"
     $unsupported = Match-Value $appLine "unsupportedRanking=\[([^\]]*)\]"
     $entityBreakdown = Match-Value $appLine "entityBreakdown=\[([^\]]*)\]"
     $hasCrash = $crashed -or -not $complete
+    $decodeMs = [double](Match-Value $timingLine "decode_ms=([0-9.]+)")
+    $nativeExpansionMs = [double](Match-Value $timingLine "native_model_build_ms=([0-9.]+)")
+    $nativeAndKotlinMs = [double](Match-Value $appLine "modelBuildMs=(\d+)")
 
     [pscustomobject]@{
         file = $file.Name
@@ -107,9 +111,10 @@ $results = foreach ($file in $files) {
         visibleGraphicalCoveragePercent = [double](Match-Value $appLine "visibleCoverage=([0-9.]+)%")
         unsupportedTypes = $unsupported
         entityBreakdown = $entityBreakdown
-        decodeMs = [double](Match-Value $timingLine "decode_ms=([0-9.]+)")
-        nativeModelExpansionMs = [double](Match-Value $timingLine "native_model_build_ms=([0-9.]+)")
-        jniKotlinModelBuildMs = [double](Match-Value $appLine "modelBuildMs=(\d+)")
+        decodeMs = $decodeMs
+        nativeModelExpansionMs = $nativeExpansionMs
+        jniKotlinModelBuildMs = [math]::Round([math]::Max(0, $nativeAndKotlinMs - $decodeMs - $nativeExpansionMs), 2)
+        renderModelBuildMs = [double](Match-Value $renderModelLine "renderModelMs=([0-9.]+)")
         firstRenderMs = [double](Match-Value $renderLine "firstRenderMs=([0-9.]+)")
         renderPrimitiveCount = [int](Match-Value $appLine "primitives=(\d+)")
         pssKb = if ($pss) { [int]$pss } else { $null }
@@ -137,8 +142,8 @@ $csvPath = Join-Path $outputPath "regression-$timestamp.csv"
 $markdownPath = Join-Path $outputPath "regression-$timestamp.md"
 $results | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath $jsonPath -Encoding utf8
 $results | Export-Csv -LiteralPath $csvPath -NoTypeInformation -Encoding utf8
-$rows = $results | ForEach-Object { "| $($_.file) | $($_.dwgVersion) | $($_.supportedEntities)/$($_.graphicalEntities) | $($_.unsupportedVisibleEntities) | $($_.graphicalCoveragePercent)% | $($_.visibleGraphicalCoveragePercent)% | $($_.decodeMs) | $($_.nativeModelExpansionMs) | $($_.jniKotlinModelBuildMs) | $($_.firstRenderMs) | $($_.renderPrimitiveCount) | $($_.pssKb) | $($_.crashed) |" }
-@("# BraginCAD multi-DWG regression", "", "| File | Version | Supported/graphical | Unsupported visible | Coverage | Visible coverage | Decode ms | Native expansion ms | JNI/Kotlin ms | First render ms | Primitives | PSS KB | Crash |", "|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|", $rows, "", "Unsupported type breakdown is retained in the JSON/CSV and per-file Logcat files.") | Set-Content -LiteralPath $markdownPath -Encoding utf8
+$rows = $results | ForEach-Object { "| $($_.file) | $($_.dwgVersion) | $($_.supportedEntities)/$($_.graphicalEntities) | $($_.unsupportedVisibleEntities) | $($_.graphicalCoveragePercent)% | $($_.visibleGraphicalCoveragePercent)% | $($_.decodeMs) | $($_.nativeModelExpansionMs) | $($_.jniKotlinModelBuildMs) | $($_.renderModelBuildMs) | $($_.firstRenderMs) | $($_.renderPrimitiveCount) | $($_.pssKb) | $($_.crashed) |" }
+@("# BraginCAD multi-DWG regression", "", "| File | Version | Supported/graphical | Unsupported visible | Coverage | Visible coverage | Decode ms | Native expansion ms | JNI/Kotlin ms | RenderModel ms | First render ms | Primitives | PSS KB | Crash |", "|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|", $rows, "", "Unsupported type breakdown is retained in the JSON/CSV and per-file Logcat files.") | Set-Content -LiteralPath $markdownPath -Encoding utf8
 $results | Format-Table file,dwgVersion,visibleGraphicalCoveragePercent,unsupportedVisibleEntities,decodeMs,nativeModelExpansionMs,firstRenderMs,pssKb,crashed -AutoSize
 Write-Host "Reports: $jsonPath $csvPath $markdownPath"
 if ($results.crashed -contains $true) { exit 2 }
