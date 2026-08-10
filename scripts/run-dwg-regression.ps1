@@ -116,10 +116,14 @@ $results = foreach ($file in $files) {
     (& $adb -s $Device exec-out run-as com.bragincad cat cache/dwg-open-debug.json 2>&1) -join "`n" | Set-Content -LiteralPath (Join-Path $outputPath "$($file.BaseName)-open-debug.json") -Encoding utf8
     (& $adb -s $Device exec-out run-as com.bragincad cat cache/dwg-open-native.log 2>&1) -join "`n" | Set-Content -LiteralPath (Join-Path $outputPath "$($file.BaseName)-native.log") -Encoding utf8
     if ($complete -and (Wait-AdbDevice 10)) {
-        $remoteScreenshot = "/data/local/tmp/bragincad-$caseIndex.png"
-        & $adb -s $Device shell screencap -p $remoteScreenshot | Out-Null
-        & $adb -s $Device pull $remoteScreenshot (Join-Path $outputPath "$($file.BaseName).png") | Out-Null
-        & $adb -s $Device shell rm $remoteScreenshot | Out-Null
+        foreach ($stage in @("fit","medium","close")) {
+            & $adb -s $Device shell am start --activity-single-top -n com.bragincad/.MainActivity --es regression_viewport $stage | Out-Null
+            Start-Sleep -Milliseconds 750
+            $remoteScreenshot = "/data/local/tmp/bragincad-$caseIndex-$stage.png"
+            & $adb -s $Device shell screencap -p $remoteScreenshot | Out-Null
+            & $adb -s $Device pull $remoteScreenshot (Join-Path $outputPath "$($file.BaseName)-$stage.png") | Out-Null
+            & $adb -s $Device shell rm $remoteScreenshot | Out-Null
+        }
     }
 }
 

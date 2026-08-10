@@ -54,6 +54,7 @@ class MainActivity : ComponentActivity() {
     private var loading by mutableStateOf(false)
     private var errorText by mutableStateOf<String?>(null)
     private var regressionStressStarted=false
+
     private var themeChoice by mutableIntStateOf(0)
     private var drawingView: DrawingView? = null
     private val prefs by lazy { getSharedPreferences("bragincad", MODE_PRIVATE) }
@@ -72,7 +73,7 @@ class MainActivity : ComponentActivity() {
         else handleViewIntent(intent)
     }
 
-    override fun onNewIntent(intent: Intent) { super.onNewIntent(intent); setIntent(intent); handleViewIntent(intent) }
+    override fun onNewIntent(intent: Intent) { super.onNewIntent(intent);setIntent(intent);val viewport=intent.getStringExtra("regression_viewport");val area=intent.getStringExtra("regression_area");when{viewport!=null->drawingView?.setRegressionViewport(viewport);area!=null->drawingView?.setRegressionArea(area=="on");else->handleViewIntent(intent)} }
 
     @Composable
     private fun BraginCadApp() {
