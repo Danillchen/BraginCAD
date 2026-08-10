@@ -42,7 +42,11 @@ for ($iteration = 0; $iteration -lt $Iterations; $iteration++) {
     $mem = (& $adb -s $Device shell dumpsys meminfo $appProcessId) -join "`n"
     $pss = [regex]::Match($mem, "TOTAL\s+(\d+)").Groups[1].Value
     $fds = @(& $adb -s $Device shell run-as com.bragincad ls "/proc/$appProcessId/fd").Count
-    $temps = @(& $adb -s $Device shell run-as com.bragincad ls cache/opened 2>$null).Where({$_}).Count
+    $previousErrorAction = $ErrorActionPreference
+    $ErrorActionPreference = "SilentlyContinue"
+    $temporaryOutput = & $adb -s $Device shell run-as com.bragincad ls cache/opened 2>&1
+    $ErrorActionPreference = $previousErrorAction
+    $temps = @($temporaryOutput).Where({$_ -and $_ -notmatch "No such file"}).Count
     $rows += [pscustomobject]@{ iteration=$iteration+1; file=$file.Name; elapsedMs=[math]::Round(([DateTime]::UtcNow-$before).TotalMilliseconds); pssKb=[int]$pss; fileDescriptors=$fds; temporaryFiles=$temps }
     & $adb -s $Device logcat -c
 }

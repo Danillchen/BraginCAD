@@ -13,3 +13,4 @@ third_party/libredwg/.git/
 .wrapper-temp/
 bragincad-*.png
 recent-after-tap.png
+qa/
