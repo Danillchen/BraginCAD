@@ -91,7 +91,8 @@ $results = foreach ($file in $files) {
     $renderLine = ([regex]::Matches($log, "(?m)^.*BraginCADRender\(.*firstRenderMs=.*$") | Select-Object -Last 1).Value
     $meminfo = (& $adb -s $Device shell dumpsys meminfo com.bragincad 2>&1) -join "`n"
     $pss = Match-Value $meminfo "TOTAL PSS:\s+(\d+)"
-    $unsupported = Match-Value $appLine "unsupportedRanking=\[(.*)\]"
+    $unsupported = Match-Value $appLine "unsupportedRanking=\[([^\]]*)\]"
+    $entityBreakdown = Match-Value $appLine "entityBreakdown=\[([^\]]*)\]"
     $hasCrash = $crashed -or -not $complete
 
     [pscustomobject]@{
@@ -105,6 +106,7 @@ $results = foreach ($file in $files) {
         graphicalCoveragePercent = [double](Match-Value $appLine " coverage=([0-9.]+)%")
         visibleGraphicalCoveragePercent = [double](Match-Value $appLine "visibleCoverage=([0-9.]+)%")
         unsupportedTypes = $unsupported
+        entityBreakdown = $entityBreakdown
         decodeMs = [double](Match-Value $timingLine "decode_ms=([0-9.]+)")
         nativeModelExpansionMs = [double](Match-Value $timingLine "native_model_build_ms=([0-9.]+)")
         jniKotlinModelBuildMs = [double](Match-Value $appLine "modelBuildMs=(\d+)")

@@ -6,6 +6,10 @@
     <string name="layers">Слои</string>
     <string name="measure">Измерить</string>
     <string name="area">Площадь</string>
+    <string name="coordinates">Координаты</string>
+    <string name="coordinate_tap">Коснитесь точки</string>
+    <string name="coordinate_units">Единицы: %1$s</string>
+    <string name="copy">Копировать</string>
     <string name="area_mode">Измерение площади</string>
     <string name="area_points_needed">Точек: %1$d. Нужно минимум 3</string>
     <string name="undo_point">Отменить точку</string>
