@@ -3,6 +3,7 @@ param(
     [string]$InputDirectory = "test-data",
     [string]$OutputDirectory = "build/regression",
     [int]$TimeoutSeconds = 90,
+    [string[]]$ViewportStages = @("fit", "medium", "close"),
     [switch]$SkipBuild,
     [switch]$SkipInstall
 )
@@ -116,7 +117,7 @@ $results = foreach ($file in $files) {
     (& $adb -s $Device exec-out run-as com.bragincad cat cache/dwg-open-debug.json 2>&1) -join "`n" | Set-Content -LiteralPath (Join-Path $outputPath "$($file.BaseName)-open-debug.json") -Encoding utf8
     (& $adb -s $Device exec-out run-as com.bragincad cat cache/dwg-open-native.log 2>&1) -join "`n" | Set-Content -LiteralPath (Join-Path $outputPath "$($file.BaseName)-native.log") -Encoding utf8
     if ($complete -and (Wait-AdbDevice 10)) {
-        foreach ($stage in @("fit","medium","close")) {
+        foreach ($stage in $ViewportStages) {
             & $adb -s $Device shell am start --activity-single-top -n com.bragincad/.MainActivity --es regression_viewport $stage | Out-Null
             Start-Sleep -Milliseconds 750
             $remoteScreenshot = "/data/local/tmp/bragincad-$caseIndex-$stage.png"
@@ -124,6 +125,7 @@ $results = foreach ($file in $files) {
             & $adb -s $Device pull $remoteScreenshot (Join-Path $outputPath "$($file.BaseName)-$stage.png") | Out-Null
             & $adb -s $Device shell rm $remoteScreenshot | Out-Null
         }
+        ((& $adb -s $Device logcat -d -v brief 2>&1) -join "`n") | Set-Content -LiteralPath (Join-Path $outputPath "$($file.BaseName).log") -Encoding utf8
     }
 }
 
