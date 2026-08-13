@@ -28,7 +28,9 @@ BraginCAD открывает реальные DWG непосредственно
 Готовый universal APK находится в разделе [Releases](../../releases/latest). Он содержит native-библиотеки для:
 
 - `arm64-v8a` — современные физические Android-устройства;
+- `armeabi-v7a` — устройства с 32-битным Android userspace;
 - `x86_64` — Android Emulator.
+- `x86` — старые 32-битные Android Emulator images.
 
 Минимальная версия Android — 8.0 (API 26).
 
@@ -41,7 +43,7 @@ $env:ANDROID_HOME = "C:\Android\Sdk"
 .\gradlew.bat assembleDebug
 ```
 
-APK будет создан в `app/build/outputs/apk/debug/`. LibreDWG собирается из vendored source для обеих ABI; подмена ARM-библиотек файлами x86_64 не используется.
+APK будет создан в `app/build/outputs/apk/debug/`. LibreDWG собирается из vendored source отдельно для каждой ABI; библиотеки одной архитектуры не подменяются файлами другой архитектуры.
 
 ## Архитектура
 

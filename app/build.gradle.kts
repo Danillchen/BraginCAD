@@ -13,10 +13,10 @@ android {
         applicationId = "com.bragincad"
         minSdk = 26
         targetSdk = 36
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = 2
+        versionName = "0.1.1"
         externalNativeBuild { cmake { arguments += listOf("-DANDROID_STL=c++_static") } }
-        ndk { abiFilters += listOf("arm64-v8a", "x86_64") }
+        ndk { abiFilters += listOf("armeabi-v7a", "arm64-v8a", "x86", "x86_64") }
     }
     externalNativeBuild { cmake { path = file("src/main/cpp/CMakeLists.txt"); version = "4.1.2" } }
     buildTypes { release { isMinifyEnabled = false } }
