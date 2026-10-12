@@ -16,7 +16,7 @@ sealed interface Primitive {
 }
 data class PatternLine(val px:Double,val py:Double,val dx:Double,val dy:Double,val ox:Double,val oy:Double)
 
-data class Layer(val id:Int,val name:String,val initiallyVisible:Boolean)
+data class Layer(val id:Int,val name:String,val initiallyVisible:Boolean,val dwgColor:Int)
 
 data class DrawingStats(
     val totalObjects:Int,

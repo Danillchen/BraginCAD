@@ -150,12 +150,14 @@ JNIEXPORT jobjectArray JNICALL Java_com_bragincad_dwg_LibreDwgAdapter_nativeRead
   Dwg_Object_LAYER **layers = dwg_get_layers(&dwg);
   char **layer_names = calloc(layer_count ? layer_count : 1, sizeof(char*));
   jboolean *layer_visible = calloc(layer_count ? layer_count : 1, sizeof(jboolean));
+  jint *layer_colors = calloc(layer_count ? layer_count : 1, sizeof(jint));
   size_t *point_layers = calloc(layer_count ? layer_count : 1, sizeof(size_t));
   double point_min_x=INFINITY,point_min_y=INFINITY,point_max_x=-INFINITY,point_max_y=-INFINITY;
   for (unsigned int i=0; i<layer_count; i++) {
     int err=0;Dwg_Object *layer_object=layers&&layers[i]?dwg_obj_generic_to_object(layers[i],&err):NULL;char *name=layer_object&&!err?dwg_obj_table_get_name(layer_object,&err):NULL;
     layer_names[i] = strdup(name ? name : "0");
     layer_visible[i] = (!layers[i] || (!layers[i]->off && !layers[i]->frozen)) ? JNI_TRUE : JNI_FALSE;
+    if(layers[i]){unsigned int rgb=layers[i]->color.rgb&0xffffff;if(!rgb&&layers[i]->color.index>0&&layers[i]->color.index<256)rgb=dwg_rgb_palette_index(layers[i]->color.index);layer_colors[i]=(jint)(rgb?rgb:0xffffff);}else layer_colors[i]=0xffffff;
     if(name&&owns_table_utf8_name(&dwg))free(name);
   }
 
@@ -209,13 +211,14 @@ JNIEXPORT jobjectArray JNICALL Java_com_bragincad_dwg_LibreDwgAdapter_nativeRead
   jobjectArray names=(*env)->NewObjectArray(env,(jsize)layer_count,string_class,NULL);
   for(unsigned int i=0;i<layer_count;i++){jstring s=new_java_string(env,layer_names[i]);(*env)->SetObjectArrayElement(env,names,i,s);(*env)->DeleteLocalRef(env,s);}
   jbooleanArray visibility=(*env)->NewBooleanArray(env,(jsize)layer_count);(*env)->SetBooleanArrayRegion(env,visibility,0,(jsize)layer_count,layer_visible);
+  jintArray colors=(*env)->NewIntArray(env,(jsize)layer_count);(*env)->SetIntArrayRegion(env,colors,0,(jsize)layer_count,layer_colors);
   jobjectArray stats=(*env)->NewObjectArray(env,(jsize)(type_n+unsupported_n),string_class,NULL);
   for(size_t i=0;i<type_n;i++){char line[160];snprintf(line,sizeof(line),"A|%s=%zu",types[i].name,types[i].count);jstring s=new_java_string(env,line);(*env)->SetObjectArrayElement(env,stats,(jsize)i,s);(*env)->DeleteLocalRef(env,s);}
   for(size_t i=0;i<unsupported_n;i++){char line[160];snprintf(line,sizeof(line),"U|%s=%zu",unsupported_types[i].name,unsupported_types[i].count);jstring s=new_java_string(env,line);(*env)->SetObjectArrayElement(env,stats,(jsize)(type_n+i),s);(*env)->DeleteLocalRef(env,s);}
   jobjectArray text_values=(*env)->NewObjectArray(env,(jsize)texts.n,string_class,NULL);
   for(size_t i=0;i<texts.n;i++){jstring s=new_java_string(env,texts.v[i]);(*env)->SetObjectArrayElement(env,text_values,(jsize)i,s);(*env)->DeleteLocalRef(env,s);}
-  jclass object_class=(*env)->FindClass(env,"java/lang/Object");jobjectArray result=(*env)->NewObjectArray(env,5,object_class,NULL);
-  (*env)->SetObjectArrayElement(env,result,0,geometry);(*env)->SetObjectArrayElement(env,result,1,names);(*env)->SetObjectArrayElement(env,result,2,visibility);(*env)->SetObjectArrayElement(env,result,3,stats);(*env)->SetObjectArrayElement(env,result,4,text_values);
+  jclass object_class=(*env)->FindClass(env,"java/lang/Object");jobjectArray result=(*env)->NewObjectArray(env,6,object_class,NULL);
+  (*env)->SetObjectArrayElement(env,result,0,geometry);(*env)->SetObjectArrayElement(env,result,1,names);(*env)->SetObjectArrayElement(env,result,2,visibility);(*env)->SetObjectArrayElement(env,result,3,stats);(*env)->SetObjectArrayElement(env,result,4,text_values);(*env)->SetObjectArrayElement(env,result,5,colors);
   LOGI("decoded objects=%u graphical=%zu visible_graphical=%zu service=%zu structural=%zu supported=%zu unsupported_graphical=%zu primitives=%zu block_cycles=%zu depth_stops=%zu layers=%u units=%u error=%d",dwg.num_objects,graphical,graphical-invisible_graphical,service,structural,supported,unsupported_graphics,render.primitives,render.cycles,render.depth_stops,layer_count,dwg.header_vars.INSUNITS,decode_error);
   LOGI("timing decode_ms=%.2f native_model_build_ms=%.2f",decode_ms,build_ms);
   LOGI("point_usage pdmode=%d pdsize=%.6g bounds=[%.6g,%.6g]-[%.6g,%.6g]",dwg.header_vars.PDMODE,dwg.header_vars.PDSIZE,point_min_x,point_min_y,point_max_x,point_max_y);
@@ -223,5 +226,5 @@ JNIEXPORT jobjectArray JNICALL Java_com_bragincad_dwg_LibreDwgAdapter_nativeRead
   LOGI("hatch_profile associative=%zu polyline_paths=%zu line_edges=%zu arc_edges=%zu ellipse_edges=%zu spline_edges=%zu",hatch_associative,hatch_poly_paths,hatch_line_edges,hatch_arc_edges,hatch_ellipse_edges,hatch_spline_edges);for(size_t i=0;i<hatch_pattern_n;i++)LOGI("hatch_pattern name=%s count=%zu",hatch_patterns[i].name,hatch_patterns[i].count);
   for(BITCODE_BL i=0;i<dwg.num_objects;i++)if(dwg.object[i].fixedtype==DWG_TYPE_STYLE&&dwg.object[i].tio.object&&dwg.object[i].tio.object->tio.STYLE){Dwg_Object_STYLE *s=dwg.object[i].tio.object->tio.STYLE;int name_err=0;char *style_name=dwg_obj_table_get_name(&dwg.object[i],&name_err),*font=NULL,*bigfont=NULL;int font_new=0,bigfont_new=0;dwg_dynapi_entity_utf8text(s,"STYLE","font_file",&font,&font_new,NULL);dwg_dynapi_entity_utf8text(s,"STYLE","bigfont_file",&bigfont,&bigfont_new,NULL);const char *kind=(font&&strstr(font,".shx"))?"SHX":((font&&strstr(font,".ttf"))?"TTF":"unknown");LOGI("text_style name=%s font=%s bigfont=%s kind=%s fixed_height=%.6g width_factor=%.6g oblique=%.6g generation=%u text=%zu mtext=%zu attrib=%zu",style_name?style_name:"",font?font:"",bigfont?bigfont:"",kind,s->text_size,s->width_factor,s->oblique_angle,s->generation,style_text[i],style_mtext[i],style_attrib[i]);if(style_name&&owns_table_utf8_name(&dwg))free(style_name);if(font_new)free(font);if(bigfont_new)free(bigfont);}
   for(unsigned int i=0;i<layer_count;i++)if(point_layers[i])LOGI("point_layer name=%s count=%zu visible=%d",layer_names[i],point_layers[i],layer_visible[i]);
-  diag(report,"06_JNI_TRANSFER_END",-1,"");if(report)fclose(report);for(unsigned int i=0;i<layer_count;i++)free(layer_names[i]);for(size_t i=0;i<texts.n;i++)free(texts.v[i]);free(texts.v);free(style_text);free(style_mtext);free(style_attrib);free(object_layers);free(point_layers);free(layer_names);free(layer_visible);free(layers);free(types);free(unsupported_types);free(hatch_patterns);free(b.v);dwg_free(&dwg);return result;
+  diag(report,"06_JNI_TRANSFER_END",-1,"");if(report)fclose(report);for(unsigned int i=0;i<layer_count;i++)free(layer_names[i]);for(size_t i=0;i<texts.n;i++)free(texts.v[i]);free(texts.v);free(style_text);free(style_mtext);free(style_attrib);free(object_layers);free(point_layers);free(layer_names);free(layer_visible);free(layer_colors);free(layers);free(types);free(unsupported_types);free(hatch_patterns);free(b.v);dwg_free(&dwg);return result;
 }

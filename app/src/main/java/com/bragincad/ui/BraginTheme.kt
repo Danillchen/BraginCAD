@@ -14,14 +14,15 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 object BraginColors {
-    val Accent = Color(0xFF60B7E6)
-    val AccentContainer = Color(0xFF173E55)
-    val DarkCanvas = Color(0xFF080D11)
-    val DarkBackground = Color(0xFF0C1116)
-    val DarkSurface = Color(0xFF121920)
-    val DarkElevated = Color(0xFF192229)
-    val DarkDialog = Color(0xFF20282F)
-    val DarkBorder = Color(0xFF34414A)
+    val Accent = Color(0xFFFF3048)
+    val AccentPressed = Color(0xFFD9243B)
+    val AccentContainer = Color(0xFF4A1720)
+    val DarkCanvas = Color(0xFF080D12)
+    val DarkBackground = Color(0xFF0A111A)
+    val DarkSurface = Color(0xFF121D29)
+    val DarkElevated = Color(0xFF192530)
+    val DarkDialog = Color(0xFF1D2935)
+    val DarkBorder = Color(0xFF293744)
     val LightCanvas = Color(0xFFF4F7F9)
     val LightSurface = Color(0xFFFCFDFE)
     val LightElevated = Color(0xFFF0F4F6)
@@ -64,29 +65,49 @@ private val BraginTypography = Typography(
 
 private val DarkScheme = darkColorScheme(
     primary = BraginColors.Accent,
-    onPrimary = Color(0xFF002B3D),
+    onPrimary = Color(0xFFFFFFFF),
     primaryContainer = BraginColors.AccentContainer,
-    onPrimaryContainer = Color(0xFFD2EEFC),
-    secondary = Color(0xFF9FCADB),
+    onPrimaryContainer = Color(0xFFFFD9DE),
+    secondary = Color(0xFFFF8A99),
+    onSecondary = Color(0xFF31000A),
+    secondaryContainer = Color(0xFF4A1720),
+    onSecondaryContainer = Color(0xFFFFD9DE),
+    tertiary = Color(0xFFFF7184),
+    onTertiary = Color(0xFF3A000D),
+    tertiaryContainer = Color(0xFF521522),
+    onTertiaryContainer = Color(0xFFFFD9DE),
     background = BraginColors.DarkBackground,
+    onBackground = Color(0xFFF5F6F8),
     surface = BraginColors.DarkSurface,
+    onSurface = Color(0xFFF5F6F8),
+    onSurfaceVariant = Color(0xFF9CAABB),
     surfaceContainer = BraginColors.DarkElevated,
     surfaceContainerHigh = BraginColors.DarkDialog,
-    surfaceContainerHighest = Color(0xFF273139),
-    outline = Color(0xFF53616A),
+    surfaceContainerHighest = Color(0xFF23313E),
+    outline = Color(0xFF5A6876),
     outlineVariant = BraginColors.DarkBorder,
+    error = Color(0xFFFF6B78),
+    surfaceTint = BraginColors.Accent,
 )
 
 private val LightScheme = lightColorScheme(
-    primary = Color(0xFF00658A),
+    primary = Color(0xFFC71935),
     onPrimary = Color.White,
-    primaryContainer = Color(0xFFD0EFFF),
-    onPrimaryContainer = Color(0xFF002F42),
-    secondary = Color(0xFF476572),
+    primaryContainer = Color(0xFFFFD9DE),
+    onPrimaryContainer = Color(0xFF40000C),
+    secondary = Color(0xFF74565B),
+    secondaryContainer = Color(0xFFFFD9DE),
+    onSecondaryContainer = Color(0xFF3B0711),
+    tertiary = Color(0xFF9C4050),
+    tertiaryContainer = Color(0xFFFFD9DE),
     background = Color(0xFFF7F9FA),
+    onBackground = Color(0xFF181B1D),
     surface = BraginColors.LightSurface,
+    onSurface = Color(0xFF181B1D),
+    onSurfaceVariant = Color(0xFF566168),
     surfaceContainer = BraginColors.LightElevated,
     surfaceContainerHigh = Color(0xFFE8EEF1),
+    surfaceContainerHighest = Color(0xFFDDE5E9),
     outline = Color(0xFF718087),
     outlineVariant = BraginColors.LightBorder,
 )
